@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  watermap:
+    build: .
+    ports:
+      - "8080:80"
+    volumes:
+      # Persister les pages générées
+      - watermap_pages:/app/pages
+      # Persister les fichiers GPX uploadés
+      - watermap_uploads:/app/uploads
+
+volumes:
+  watermap_pages:
+  watermap_uploads:

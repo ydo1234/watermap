@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WaterMap - Gestion des itinéraires</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    h1 {
+      color: white;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.1rem;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      margin-bottom: 30px;
+    }
+    .card h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+    #upload-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    #upload-form > div {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #upload-form label {
+      font-weight: 600;
+      color: #333;
+      font-size: 0.95rem;
+    }
+    #upload-form input[type=text],
+    #upload-form input[type=file] {
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    #upload-form input[type=text]:focus,
+    #upload-form input[type=file]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    #upload-form button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      align-self: flex-start;
+    }
+    #upload-form button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #upload-status {
+      font-size: 0.95rem;
+      color: #666;
+      font-weight: 500;
+      min-height: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table thead {
+      background: #f8f9fa;
+    }
+    table th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    table td {
+      padding: 15px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    table tr:hover {
+      background: #f8f9fa;
+    }
+    table a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    table a:hover {
+      color: #764ba2;
+    }
+    .btn-delete {
+      padding: 8px 12px;
+      background: #ff6b6b;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    .btn-delete:hover {
+      background: #ee5a52;
+    }
+    .empty-state {
+      text-align: center;
+      color: #999;
+      font-size: 1.1rem;
+      padding: 40px 20px;
+    }
+    @media (max-width: 768px) {
+      h1 { font-size: 1.8rem; }
+      .card { padding: 20px; }
+      #upload-form { gap: 12px; }
+      table { font-size: 0.9rem; }
+      table th, table td { padding: 10px; }
+      .container { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🗺️ WaterMap</h1>
+      <p class="subtitle">Gérez vos itinéraires et découvrez les points d'eau à proximité</p>
+    </header>
+
+    <div class="card">
+      <h2>📤 Créer une nouvelle page</h2>
+      <form id="upload-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+        <div>
+          <label for="page_name">Nom de la page</label>
+          <input type="text" id="page_name" name="page_name" placeholder="Ex: Rando Cévennes" required>
+        </div>
+        <div>
+          <label for="gpx_file">Fichier GPX</label>
+          <input type="file" id="gpx_file" name="gpx_file" accept=".gpx" required>
+        </div>
+        <button type="submit">📂 Téléverser</button>
+      </form>
+      <div style="margin-top: 20px;">
+        <progress id="upload-progress" value="0" max="100" style="display:none;"></progress>
+        <div id="upload-status"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Mes pages</h2>
+      {% if pages %}
+        <table>
+          <thead>
+            <tr>
+              <th>📍 Page</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for page in pages %}
+              <tr>
+                <td><a href="{{ url_for('page', page_name=page.name) }}">{{ page.name }}</a></td>
+                <td style="text-align: right;">
+                  <form action="{{ url_for('delete', page_name=page.name) }}" method="post" style="display:inline;">
+                    <button type="submit" class="btn-delete" onclick="return confirm('Supprimer {{ page.name }} ?');">🗑️ Supprimer</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="empty-state">✨ Aucune page pour le moment. Commencez par en créer une !</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('upload-form');
+    const progress = document.getElementById('upload-progress');
+    const status = document.getElementById('upload-status');
+
+    function pollStatus(taskId) {
+      fetch(`/status/${taskId}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.error) {
+            status.textContent = '❌ Erreur du traitement : ' + data.error;
+            return;
+          }
+          progress.style.display = 'block';
+          progress.value = data.progress;
+          status.textContent = data.message + ' (' + data.progress + '%)';
+          if (data.done) {
+            if (data.page_url) {
+              window.location = data.page_url;
+            } else {
+              status.textContent = '⚠️ Traitement terminé, mais aucune page disponible.';
+            }
+          } else {
+            setTimeout(() => pollStatus(taskId), 500);
+          }
+        })
+        .catch(() => {
+          status.textContent = '❌ Erreur lors de la vérification du statut.';
+        });
+    }
+
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const fileInput = form.querySelector('input[name="gpx_file"]');
+      if (!fileInput.files.length) {
+        status.textContent = '⚠️ Veuillez choisir un fichier GPX.';
+        return;
+      }
+
+      progress.style.display = 'block';
+      progress.value = 0;
+      status.textContent = '📤 Téléversement du fichier...';
+      const formData = new FormData(form);
+      fetch(form.action, {
+        method: 'POST',
+        body: formData,
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.task_id) {
+          status.textContent = '⏳ Traitement en cours...';
+          pollStatus(data.task_id);
+        } else if (data.error) {
+          status.textContent = '❌ Erreur : ' + data.error;
+        } else {
+          status.textContent = '❌ Erreur inattendue.';
+        }
+      })
+      .catch(() => {
+        status.textContent = '❌ Erreur pendant l\'envoi du fichier.';
+      });
+    });
+  </script>
+</body>
+</html>
