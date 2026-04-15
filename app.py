@@ -14,7 +14,7 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 PAGE_FOLDER = os.path.join(BASE_DIR, 'pages')
 ALLOWED_EXTENSIONS = {'gpx'}
 WATER_GPX = os.path.join(BASE_DIR, 'water.gpx')
-WC_JSON = os.path.join(BASE_DIR, 'wc.json')
+TOILETS_GPX = os.path.join(BASE_DIR, 'toilets_all.osm.gpx')
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PAGE_FOLDER, exist_ok=True)
@@ -23,9 +23,9 @@ os.makedirs(PAGE_FOLDER, exist_ok=True)
 _water_points_cache = None
 _water_points_lock = threading.Lock()
 
-# Cache global pour les restaurants
-_restaurants_cache = None
-_restaurants_lock = threading.Lock()
+# Cache global pour les toilettes
+_toilets_cache = None
+_toilets_lock = threading.Lock()
 
 def load_existing_pages():
     """Charger les pages existantes au démarrage."""
@@ -69,42 +69,38 @@ def load_water_points_cache():
     except Exception as e:
         print(f"❌ Erreur lors du préchargement des points d'eau: {e}")
 
-def load_restaurants_cache():
-    """Précharger les restaurants au démarrage pour optimiser les performances."""
-    global _restaurants_cache
+def load_toilets_cache():
+    """Précharger les toilettes au démarrage pour optimiser les performances."""
+    global _toilets_cache
     try:
-        if os.path.exists(WC_JSON):
-            print("Préchargement des restaurants...")
-            with open(WC_JSON, 'r', encoding='utf-8', errors='replace') as f:
-                data = json.load(f)
-            restaurants = []
-            for feature in data.get('features', []):
+        if os.path.exists(TOILETS_GPX):
+            print("Préchargement des toilettes...")
+            with open(TOILETS_GPX, 'r', encoding='utf-8', errors='replace') as f:
+                raw_xml = f.read()
+            fixed_xml = re.sub(r'&(?!([A-Za-z]+|#\d+|#x[0-9A-Fa-f]+);)', '&amp;', raw_xml)
+            root = ET.fromstring(fixed_xml)
+            ns = {'gpx': root.tag.split('}')[0].strip('{')}
+            toilets = []
+            for wpt in root.findall('.//gpx:wpt', ns):
                 try:
-                    coords = feature['geometry']['coordinates']
-                    lon, lat = coords[0], coords[1]
-                    tags = feature['properties']['tags']
-                    name = tags.get('name', f"Restaurant {lat:.5f},{lon:.5f}")
-                    cuisine = tags.get('cuisine', '')
-                    phone = tags.get('phone', '')
-                    website = tags.get('website', '')
-                    restaurant = {
-                        'lat': lat, 
-                        'lon': lon, 
-                        'name': name,
-                        'cuisine': cuisine,
-                        'phone': phone,
-                        'website': website
-                    }
-                    restaurants.append(restaurant)
-                except (KeyError, IndexError, TypeError):
+                    lat = float(wpt.attrib.get('lat', 0))
+                    lon = float(wpt.attrib.get('lon', 0))
+                except (TypeError, ValueError):
                     continue
-            with _restaurants_lock:
-                _restaurants_cache = restaurants
-            print(f"✅ {len(restaurants)} restaurants préchargés")
+                name = None
+                name_tag = wpt.find('gpx:name', ns)
+                if name_tag is not None and name_tag.text:
+                    name = name_tag.text
+                if name is None:
+                    name = f"Toilettes {lat:.5f},{lon:.5f}"
+                toilets.append({'lat': lat, 'lon': lon, 'name': name})
+            with _toilets_lock:
+                _toilets_cache = toilets
+            print(f"✅ {len(toilets)} toilettes préchargées")
         else:
-            print("⚠️ Fichier wc.json non trouvé")
+            print("⚠️ Fichier toilets_all.osm.gpx non trouvé")
     except Exception as e:
-        print(f"❌ Erreur lors du préchargement des restaurants: {e}")
+        print(f"❌ Erreur lors du préchargement des toilettes: {e}")
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max
@@ -114,7 +110,7 @@ status_lock = threading.Lock()
 
 load_existing_pages()
 load_water_points_cache()
-load_restaurants_cache()
+load_toilets_cache()
 
 
 def set_status(task_id, progress, message, done=False, page_url=None, error=None):
@@ -231,43 +227,39 @@ def parse_water_points():
             return points
 
 
-def parse_restaurants():
-    """Retourne les restaurants depuis le cache préchargé."""
-    with _restaurants_lock:
-        if _restaurants_cache is not None:
-            return _restaurants_cache.copy()  # Retourner une copie pour éviter les modifications
+def parse_toilets():
+    """Retourne les toilettes depuis le cache préchargé."""
+    with _toilets_lock:
+        if _toilets_cache is not None:
+            return _toilets_cache.copy()  # Retourner une copie pour éviter les modifications
         else:
             # Fallback si le cache n'est pas chargé
-            print("⚠️ Cache des restaurants non disponible, parsing à la volée...")
-            if not os.path.exists(WC_JSON):
+            print("⚠️ Cache des toilettes non disponible, parsing à la volée...")
+            if not os.path.exists(TOILETS_GPX):
                 return []
             try:
-                with open(WC_JSON, 'r', encoding='utf-8', errors='replace') as f:
-                    data = json.load(f)
-                restaurants = []
-                for feature in data.get('features', []):
+                with open(TOILETS_GPX, 'r', encoding='utf-8', errors='replace') as f:
+                    raw_xml = f.read()
+                fixed_xml = re.sub(r'&(?!([A-Za-z]+|#\d+|#x[0-9A-Fa-f]+);)', '&amp;', raw_xml)
+                root = ET.fromstring(fixed_xml)
+                ns = {'gpx': root.tag.split('}')[0].strip('{')}
+                toilets = []
+                for wpt in root.findall('.//gpx:wpt', ns):
                     try:
-                        coords = feature['geometry']['coordinates']
-                        lon, lat = coords[0], coords[1]
-                        tags = feature['properties']['tags']
-                        name = tags.get('name', f"Restaurant {lat:.5f},{lon:.5f}")
-                        cuisine = tags.get('cuisine', '')
-                        phone = tags.get('phone', '')
-                        website = tags.get('website', '')
-                        restaurant = {
-                            'lat': lat, 
-                            'lon': lon, 
-                            'name': name,
-                            'cuisine': cuisine,
-                            'phone': phone,
-                            'website': website
-                        }
-                        restaurants.append(restaurant)
-                    except (KeyError, IndexError, TypeError):
+                        lat = float(wpt.attrib.get('lat', 0))
+                        lon = float(wpt.attrib.get('lon', 0))
+                    except (TypeError, ValueError):
                         continue
-                return restaurants
+                    name = None
+                    name_tag = wpt.find('gpx:name', ns)
+                    if name_tag is not None and name_tag.text:
+                        name = name_tag.text
+                    if name is None:
+                        name = f"Toilettes {lat:.5f},{lon:.5f}"
+                    toilets.append({'lat': lat, 'lon': lon, 'name': name})
+                return toilets
             except Exception as e:
-                print(f"⚠️ Erreur lecture restaurants: {e}")
+                print(f"⚠️ Erreur lecture toilettes: {e}")
                 return []
 
 
@@ -318,8 +310,8 @@ def nearby_water_points(track_points, max_distance_m=500, task_id=None):
     return nearby
 
 
-def nearby_restaurants(track_points, max_distance_m=500, task_id=None):
-    restaurants = parse_restaurants()
+def nearby_toilets(track_points, max_distance_m=500, task_id=None):
+    toilets = parse_toilets()
     nearby = []
     if not track_points:
         return nearby
@@ -336,18 +328,18 @@ def nearby_restaurants(track_points, max_distance_m=500, task_id=None):
     bbox_min_lon = min_lon - lon_padding
     bbox_max_lon = max_lon + lon_padding
     
-    # Optimisation 2 : filtrer les restaurants hors bbox
-    restaurants_in_bbox = [p for p in restaurants 
-                           if bbox_min_lat <= p['lat'] <= bbox_max_lat 
-                           and bbox_min_lon <= p['lon'] <= bbox_max_lon]
+    # Optimisation 2 : filtrer les toilettes hors bbox
+    toilets_in_bbox = [p for p in toilets 
+                       if bbox_min_lat <= p['lat'] <= bbox_max_lat 
+                       and bbox_min_lon <= p['lon'] <= bbox_max_lon]
     
     # Optimisation 3 : échantillonner la trace
     sample_step = max(1, len(track_points) // 300)
     sampled_points = track_points[::sample_step]
     
-    total = len(restaurants_in_bbox)
+    total = len(toilets_in_bbox)
     progress_step = max(1, total // 100)
-    for i, point in enumerate(restaurants_in_bbox, start=1):
+    for i, point in enumerate(toilets_in_bbox, start=1):
         lat = point['lat']
         lon = point['lon']
         try:
@@ -360,7 +352,7 @@ def nearby_restaurants(track_points, max_distance_m=500, task_id=None):
             nearby.append(point_copy)
         if task_id and total > 100 and i % progress_step == 0:
             progress = 85 + int(i / total * 10)
-            set_status(task_id, progress, f"Traitement restaurants {i}/{total}")
+            set_status(task_id, progress, f"Traitement toilettes {i}/{total}")
     return nearby
 
 
@@ -373,19 +365,19 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
         water_points = parse_water_points()
         set_status(task_id, 25, f'{len(water_points)} points d\u2019eau disponibles')
         nearby_water = nearby_water_points(track_points, max_distance_m=500, task_id=task_id)
-        set_status(task_id, 80, 'Recherche des restaurants...')
-        nearby_restaurants_list = nearby_restaurants(track_points, max_distance_m=500, task_id=task_id)
+        set_status(task_id, 80, 'Recherche des toilettes...')
+        nearby_toilets_list = nearby_toilets(track_points, max_distance_m=500, task_id=task_id)
         
-        # Déduplication : si un restaurant est au même endroit qu'un point d'eau, supprimer le point d'eau
+        # Déduplication : si des toilettes sont au même endroit qu'un point d'eau, supprimer le point d'eau
         # Seuil de proximité : 10 mètres (coordonnées très proches)
-        restaurant_locations = set()
-        for restaurant in nearby_restaurants_list:
-            restaurant_locations.add((round(restaurant['lat'], 5), round(restaurant['lon'], 5)))
+        toilet_locations = set()
+        for toilet in nearby_toilets_list:
+            toilet_locations.add((round(toilet['lat'], 5), round(toilet['lon'], 5)))
         
         nearby_water_filtered = [w for w in nearby_water 
-                                 if (round(w['lat'], 5), round(w['lon'], 5)) not in restaurant_locations]
+                                 if (round(w['lat'], 5), round(w['lon'], 5)) not in toilet_locations]
         
-        set_status(task_id, 85, f'{len(nearby_water_filtered)} points d\u2019eau et {len(nearby_restaurants_list)} restaurants trouvés')
+        set_status(task_id, 85, f'{len(nearby_water_filtered)} points d\u2019eau et {len(nearby_toilets_list)} toilettes trouvés')
         set_status(task_id, 90, 'Génération de la page...')
 
         page_path = os.path.join(PAGE_FOLDER, f"{page_name}.html")
@@ -397,11 +389,10 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
                 lat=pt['lat'], lon=pt['lon'], name=html.escape(pt['name']).replace('"', '\\"'), distance=pt['distance_m'])
             for pt in nearby_water_filtered
         ])
-        restaurants_js = ','.join([
-            '{{lat:{lat},lon:{lon},name:"{name}",cuisine:"{cuisine}",distance:{distance}}}'.format(
-                lat=pt['lat'], lon=pt['lon'], name=html.escape(pt['name']).replace('"', '\\"'), 
-                cuisine=html.escape(pt.get('cuisine', '')).replace('"', '\\"'), distance=pt['distance_m'])
-            for pt in nearby_restaurants_list
+        toilets_js = ','.join([
+            '{{lat:{lat},lon:{lon},name:"{name}",distance:{distance}}}'.format(
+                lat=pt['lat'], lon=pt['lon'], name=html.escape(pt['name']).replace('"', '\\"'), distance=pt['distance_m'])
+            for pt in nearby_toilets_list
         ])
         if nearby_water_filtered:
             water_list_html = '<ul>' + ''.join([
@@ -410,15 +401,13 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
             ]) + '</ul>'
         else:
             water_list_html = '<div class="empty-message">✨ Aucun point d\u2019eau trouvé sous 500 m du parcours.</div>'
-        if nearby_restaurants_list:
-            restaurants_list_html = '<ul>' + ''.join([
-                f"<li>{html.escape(pt['name'])}" + 
-                (f" ({html.escape(pt['cuisine'])})" if pt.get('cuisine') else "") + 
-                f" — {pt['distance_m']} m</li>"
-                for pt in nearby_restaurants_list
+        if nearby_toilets_list:
+            toilets_list_html = '<ul>' + ''.join([
+                f"<li>{html.escape(pt['name'])} — {pt['distance_m']} m</li>"
+                for pt in nearby_toilets_list
             ]) + '</ul>'
         else:
-            restaurants_list_html = '<div class="empty-message">✨ Aucun restaurant trouvé sous 500 m du parcours.</div>'
+            toilets_list_html = '<div class="empty-message">✨ Aucune toilette trouvée sous 500 m du parcours.</div>'
 
         with open(page_path, 'w', encoding='utf-8') as f:
             f.write(f"""<!doctype html>
@@ -526,9 +515,9 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
       </section>
     </div>
     <div class=\"card\">
-      <h2>🍽️ Restaurants à moins de 500 m</h2>
+      <h2>🚻 Toilettes à moins de 500 m</h2>
       <section>
-        {restaurants_list_html}
+        {toilets_list_html}
       </section>
     </div>
   </div>
@@ -551,16 +540,15 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
       shadowSize: [41, 41]
     }});
 
-    const restaurantPoints = [{restaurants_js}];
-    const restaurantLayer = L.layerGroup().addTo(map);
-    const restaurantIcon = L.icon({{
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2cadd.png',
+    const toiletPoints = [{toilets_js}];
+    const toiletLayer = L.layerGroup().addTo(map);
+    const toiletIcon = L.icon({{
+      iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNSIgaGVpZ2h0PSI0MSIgdmlld0JveD0iMCAwIDI1IDQxIj48Y2lyY2xlIGN4PSIxMi41IiBjeT0iMjAiIHI9IjgiIGZpbGw9IiMyZWNjNzEiLz48cGF0aCBmaWxsPSIjMjZhNjlhIiBkPSJNMTIuNSAwQzUuNTk2IDAgMCA1LjU5NiAwIDEyLjVjMCA3Ljc0MyA5Ljk4IDI4LjUgMTIuNSAyOC41czEyLjUtMjAuNzU3IDEyLjUtMjguNUMyNSA1LjU5NiAxOS40MDQgMCAxMi41IDB6Ii8+PC9zdmc+',
       iconSize: [25, 41],
       iconAnchor: [12, 41],
       popupAnchor: [1, -34],
       shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      shadowSize: [41, 41],
-      className: 'restaurant-marker'
+      shadowSize: [41, 41]
     }});
 
     waterPoints.forEach(function(point) {{
@@ -573,26 +561,25 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
       marker.addTo(waterLayer);
     }});
 
-    restaurantPoints.forEach(function(point) {{
-      const marker = L.marker([point.lat, point.lon], {{ icon: restaurantIcon }})
+    toiletPoints.forEach(function(point) {{
+      const marker = L.marker([point.lat, point.lon], {{ icon: toiletIcon }})
         .bindPopup(
           '<strong>' + point.name + '</strong><br>' +
-          (point.cuisine ? 'Cuisine: ' + point.cuisine + '<br>' : '') +
           'Distance: ' + point.distance + ' m<br>' +
           '<a href=\"https://maps.google.com/maps?q=&layer=c&cbll=' + point.lat + ',' + point.lon + '\" target=\"_blank\">Street View</a>'
         );
-      marker.addTo(restaurantLayer);
+      marker.addTo(toiletLayer);
     }});
 
     new L.GPX('{gpx_url}', {{async: true}}).on('loaded', function(e) {{
       map.fitBounds(e.target.getBounds());
       const allMarkers = [];
-      if (waterPoints.length || restaurantPoints.length) {{
+      if (waterPoints.length || toiletPoints.length) {{
         if (waterLayer.getBounds().isValid()) {{
           allMarkers.push(waterLayer.getBounds());
         }}
-        if (restaurantLayer.getBounds().isValid()) {{
-          allMarkers.push(restaurantLayer.getBounds());
+        if (toiletLayer.getBounds().isValid()) {{
+          allMarkers.push(toiletLayer.getBounds());
         }}
       }}
       if (allMarkers.length) {{
@@ -604,11 +591,6 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
       }}
     }}).addTo(map);
   </script>
-  <style>
-    .restaurant-marker {{
-      filter: hue-rotate(10deg) brightness(1.2);
-    }}
-  </style>
 </body>
 </html>""")
 
