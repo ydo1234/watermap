@@ -543,7 +543,7 @@ def process_gpx_task(task_id, upload_path, page_name, original_name):
     const toiletPoints = [{toilets_js}];
     const toiletLayer = L.layerGroup().addTo(map);
     const toiletIcon = L.icon({{
-      iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNSIgaGVpZ2h0PSI0MSIgdmlld0JveD0iMCAwIDI1IDQxIj48Y2lyY2xlIGN4PSIxMi41IiBjeT0iMjAiIHI9IjgiIGZpbGw9IiMyZWNjNzEiLz48cGF0aCBmaWxsPSIjMjZhNjlhIiBkPSJNMTIuNSAwQzUuNTk2IDAgMCA1LjU5NiAwIDEyLjVjMCA3Ljc0MyA5Ljk4IDI4LjUgMTIuNSAyOC41czEyLjUtMjAuNzU3IDEyLjUtMjguNUMyNSA1LjU5NiAxOS40MDQgMCAxMi41IDB6Ii8+PC9zdmc+',
+      iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNSIgaGVpZ2h0PSI0MSIgdmlld0JveD0iMCAwIDI1IDQxIj48cGF0aCBmaWxsPSIjMmVjYzcxIiBzdHJva2U9IiMyN2FlNjAiIHN0cm9rZS13aWR0aD0iMSIgZD0iTTEyLjUgMEM1LjU5NiAwIDAgNS41OTYgMCAxMi41YzAgNy43NDMgOS45OCAyOC41IDEyLjUgMjguNXMxMi41LTIwLjc1NyAxMi41LTI4LjVDMjUgNS41OTYgMTkuNDA0IDAgMTIuNSAweiIvPjxjaXJjbGUgY3g9IjEyLjUiIGN5PSIxMi41IiByPSI0IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==',
       iconSize: [25, 41],
       iconAnchor: [12, 41],
       popupAnchor: [1, -34],
