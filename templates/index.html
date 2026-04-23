@@ -170,15 +170,30 @@
           <label for="page_name">Nom de la page</label>
           <input type="text" id="page_name" name="page_name" placeholder="Ex: Rando Cévennes" required>
         </div>
-        <div>
-          <label for="gpx_file">Fichier GPX</label>
-          <input type="file" id="gpx_file" name="gpx_file" accept=".gpx" required>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #ccc;">
+          <div id="source-tabs" style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button type="button" id="tab-file" class="tab-btn active" style="padding: 5px 15px; border-radius: 20px; border: none; cursor: pointer; background: #667eea; color: white;">Fichier GPX</button>
+            <button type="button" id="tab-url" class="tab-btn" style="padding: 5px 15px; border-radius: 20px; border: none; cursor: pointer; background: #e0e0e0; color: #666;">Lien Google Maps / GPX</button>
+          </div>
+
+          <div id="file-input-container">
+            <label for="gpx_file">Choisir un fichier .gpx</label>
+            <input type="file" id="gpx_file" name="gpx_file" accept=".gpx">
+          </div>
+
+          <div id="url-input-container" style="display: none;">
+            <label for="gpx_url_input">Lien Google My Maps ou URL GPX</label>
+            <input type="text" id="gpx_url_input" name="gpx_url" placeholder="https://www.google.com/maps/d/viewer?mid=...">
+            <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Note : Pour Google Maps, utilisez un lien "My Maps".</p>
+          </div>
         </div>
+
         <div>
           <label for="max_distance">Distance max depuis la trace (m)</label>
           <input type="number" id="max_distance" name="max_distance" min="0" step="1" value="500" required>
         </div>
-        <button type="submit">📂 Téléverser</button>
+        <button type="submit">📂 Créer la page</button>
       </form>
       <div style="margin-top: 20px;">
         <progress id="upload-progress" value="0" max="100" style="display:none;"></progress>
@@ -219,6 +234,38 @@
     const form = document.getElementById('upload-form');
     const progress = document.getElementById('upload-progress');
     const status = document.getElementById('upload-status');
+    const tabFile = document.getElementById('tab-file');
+    const tabUrl = document.getElementById('tab-url');
+    const fileContainer = document.getElementById('file-input-container');
+    const urlContainer = document.getElementById('url-input-container');
+    const gpxFile = document.getElementById('gpx_file');
+    const gpxUrl = document.getElementById('gpx_url_input');
+
+    let activeTab = 'file';
+
+    tabFile.addEventListener('click', () => {
+      activeTab = 'file';
+      tabFile.style.background = '#667eea';
+      tabFile.style.color = 'white';
+      tabUrl.style.background = '#e0e0e0';
+      tabUrl.style.color = '#666';
+      fileContainer.style.display = 'block';
+      urlContainer.style.display = 'none';
+      gpxFile.setAttribute('required', '');
+      gpxUrl.removeAttribute('required');
+    });
+
+    tabUrl.addEventListener('click', () => {
+      activeTab = 'url';
+      tabUrl.style.background = '#667eea';
+      tabUrl.style.color = 'white';
+      tabFile.style.background = '#e0e0e0';
+      tabFile.style.color = '#666';
+      fileContainer.style.display = 'none';
+      urlContainer.style.display = 'block';
+      gpxUrl.setAttribute('required', '');
+      gpxFile.removeAttribute('required');
+    });
 
     function pollStatus(taskId) {
       fetch(`/status/${taskId}`)
@@ -248,15 +295,19 @@
 
     form.addEventListener('submit', function(event) {
       event.preventDefault();
-      const fileInput = form.querySelector('input[name="gpx_file"]');
-      if (!fileInput.files.length) {
+      
+      if (activeTab === 'file' && !gpxFile.files.length) {
         status.textContent = '⚠️ Veuillez choisir un fichier GPX.';
+        return;
+      }
+      if (activeTab === 'url' && !gpxUrl.value.trim()) {
+        status.textContent = '⚠️ Veuillez entrer une URL.';
         return;
       }
 
       progress.style.display = 'block';
       progress.value = 0;
-      status.textContent = '📤 Téléversement du fichier...';
+      status.textContent = activeTab === 'file' ? '📤 Téléversement du fichier...' : '🌐 Récupération du tracé...';
       const formData = new FormData(form);
       fetch(form.action, {
         method: 'POST',
@@ -274,7 +325,7 @@
         }
       })
       .catch(() => {
-        status.textContent = '❌ Erreur pendant l\'envoi du fichier.';
+        status.textContent = '❌ Erreur pendant l\'envoi.';
       });
     });
   </script>

@@ -1,3 +1,5 @@
+import requests
+import urllib.parse
 import html
 import json
 import math
@@ -175,8 +177,17 @@ def point_to_segment_distance(lat, lon, lat1, lon1, lat2, lon2):
 
 
 def parse_gpx_track_points(gpx_path):
-    tree = ET.parse(gpx_path)
-    root = tree.getroot()
+    try:
+        tree = ET.parse(gpx_path)
+        root = tree.getroot()
+    except ET.ParseError as e:
+        # Vérifier si c'est du HTML
+        with open(gpx_path, 'r', encoding='utf-8', errors='ignore') as f:
+            start = f.read(100).lower()
+            if '<!doctype html' in start or '<html' in start:
+                raise ValueError("Le fichier récupéré est une page Web (HTML) et non un tracé GPX/KML. Vérifiez le lien fourni.")
+        raise ValueError(f"Erreur de lecture du fichier GPX : {e}")
+        
     ns = {'gpx': root.tag.split('}')[0].strip('{')}
     points = []
     for trkseg in root.findall('.//gpx:trkseg', ns):
@@ -357,11 +368,187 @@ def nearby_toilets(track_points, max_distance_m=500, task_id=None):
 
 
 
-def process_gpx_task(task_id, upload_path, page_name, original_name):
+def kml_to_gpx(kml_content):
     try:
-        set_status(task_id, 5, 'Analyse du fichier GPX...')
+        raw_xml = kml_content.decode('utf-8', errors='replace')
+        # Nettoyage basique pour ElementTree
+        fixed_xml = re.sub(r'&(?!([A-Za-z]+|#\d+|#x[0-9A-Fa-f]+);)', '&amp;', raw_xml)
+        root = ET.fromstring(fixed_xml)
+        # KML peut avoir plusieurs namespaces
+        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+        
+        coords_elements = root.findall('.//kml:coordinates', ns)
+        if not coords_elements:
+            coords_elements = root.findall('.//coordinates')
+            
+        points = []
+        for elem in coords_elements:
+            if elem.text:
+                # Les coordonnées KML sont "lon,lat,alt" séparées par des espaces
+                for chunk in elem.text.strip().split():
+                    parts = chunk.split(',')
+                    if len(parts) >= 2:
+                        try:
+                            lon = float(parts[0])
+                            lat = float(parts[1])
+                            points.append((lat, lon))
+                        except ValueError:
+                            continue
+        
+        if not points:
+            raise ValueError("Aucun point trouvé dans le KML")
+
+        # Création d'un mini GPX
+        gpx_root = ET.Element('gpx', version='1.1', creator='WaterMap', xmlns='http://www.topografix.com/GPX/1/1')
+        trk = ET.SubElement(gpx_root, 'trk')
+        trkseg = ET.SubElement(trk, 'trkseg')
+        for lat, lon in points:
+            ET.SubElement(trkseg, 'trkpt', lat=f"{lat:.7f}", lon=f"{lon:.7f}")
+        
+        return ET.tostring(gpx_root, encoding='utf-8')
+    except Exception as e:
+        print(f"Erreur conversion KML: {e}")
+        raise
+
+
+def process_gpx_task(task_id, upload_path, page_name, original_name, gpx_url=None):
+    try:
+        if gpx_url:
+            set_status(task_id, 5, 'Récupération du tracé distant...')
+            target_url = gpx_url
+            
+            # 1. Résolution des liens raccourcis
+            if 'maps.app.goo.gl' in target_url or 'goo.gl/maps' in target_url:
+                resp = requests.head(target_url, allow_redirects=True, timeout=10)
+                target_url = resp.url
+            
+            # 2. Gestion de la page de consentement Google
+            if 'consent.google.com' in target_url:
+                continue_match = re.search(r'continue=([^&]+)', target_url)
+                if continue_match:
+                    target_url = urllib.parse.unquote(continue_match.group(1))
+            
+            # 3. Cas spécial : Google Maps Directions (Itinéraires)
+            if '/maps/dir/' in target_url:
+                set_status(task_id, 8, 'Extraction des points de l\'itinéraire...')
+                # Détection du mode de transport
+                mode = 'bicycle'
+                if '!3e0' in target_url: mode = 'car'
+                elif '!3e1' in target_url: mode = 'bicycle'
+                elif '!3e2' in target_url: mode = 'foot'
+                
+                # Extraction multi-format des coordonnées
+                # Google utilise !1d (Lon) et !2d (Lat) pour les points de l'itinéraire
+                raw = re.findall(r'!1d(-?\d+\.\d+)!2d(-?\d+\.\d+)', target_url)
+                # Parfois !2d (Lon) et !3d (Lat)
+                raw += re.findall(r'!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)', target_url)
+                
+                all_coords = []
+                for c1, c2 in raw:
+                    v1, v2 = float(c1), float(c2)
+                    # Heuristique pour la France (Lat ~45, Lon ~5)
+                    if 40 < v1 < 52 and -5 < v2 < 12:
+                        all_coords.append((v2, v1)) # C'était (Lat, Lon) -> on veut (Lon, Lat)
+                    else:
+                        all_coords.append((v1, v2)) # C'était déjà (Lon, Lat)
+                
+                if not all_coords:
+                    simple = re.findall(r'/(-?\d+\.\d+),(-?\d+\.\d+)', target_url)
+                    for lat, lon in simple:
+                        all_coords.append((float(lon), float(lat)))
+
+                # Déduplication et nettoyage
+                coords = []
+                seen = set()
+                for pt in all_coords:
+                    # Arrondi pour éviter les doublons quasi-identiques
+                    pt_round = (round(pt[0], 6), round(pt[1], 6))
+                    if pt_round not in seen:
+                        coords.append(pt)
+                        seen.add(pt_round)
+
+                if len(coords) >= 2:
+                    set_status(task_id, 10, f'Calcul du tracé routier ({mode})...')
+                    osrm_coords = ';'.join([f"{lon},{lat}" for lon, lat in coords])
+                    
+                    # Correction des noms d'instances pour openstreetmap.de
+                    if mode == 'bicycle':
+                        osrm_base = "https://routing.openstreetmap.de/routed-bike"
+                    elif mode == 'foot':
+                        osrm_base = "https://routing.openstreetmap.de/routed-foot"
+                    else:
+                        osrm_base = "https://routing.openstreetmap.de/routed-car"
+                    
+                    osrm_url = f"{osrm_base}/route/v1/driving/{osrm_coords}?overview=full&geometries=geojson"
+                    
+                    try:
+                        headers = {'User-Agent': 'WaterMap/1.0'}
+                        osrm_resp = requests.get(osrm_url, headers=headers, timeout=15)
+                        osrm_resp.raise_for_status()
+                        route_data = osrm_resp.json()
+                        
+                        if route_data.get('routes'):
+                            geometry = route_data['routes'][0]['geometry']['coordinates']
+                            gpx_root = ET.Element('gpx', version='1.1', creator='WaterMap', xmlns='http://www.topografix.com/GPX/1/1')
+                            trk = ET.SubElement(gpx_root, 'trk')
+                            trkseg = ET.SubElement(trkSEG := trk, 'trkseg') # trkSEG unused, keep simple
+                            trkseg = trk.find('trkseg') # Error in my thought, let's just use the object
+                            
+                            # On reconstruit proprement
+                            gpx_root = ET.Element('gpx', version='1.1', creator='WaterMap', xmlns='http://www.topografix.com/GPX/1/1')
+                            trk = ET.SubElement(gpx_root, 'trk')
+                            trkseg = ET.SubElement(trk, 'trkseg')
+                            for lon, lat in geometry:
+                                ET.SubElement(trkseg, 'trkpt', lat=str(lat), lon=str(lon))
+                            
+                            content = ET.tostring(gpx_root, encoding='utf-8')
+                            with open(upload_path, 'wb') as f:
+                                f.write(content)
+                            set_status(task_id, 12, f'Tracé routier récupéré ({len(geometry)} points)')
+                        else:
+                            raise ValueError("OSRM n'a pas pu calculer d'itinéraire.")
+                    except Exception as e:
+                        print(f"Erreur OSRM: {e}. Fallback vers ligne droite.")
+                        gpx_root = ET.Element('gpx', version='1.1', creator='WaterMap', xmlns='http://www.topografix.com/GPX/1/1')
+                        trk = ET.SubElement(gpx_root, 'trk')
+                        trkseg = ET.SubElement(trk, 'trkseg')
+                        for lon, lat in coords:
+                            ET.SubElement(trkseg, 'trkpt', lat=str(lat), lon=str(lon))
+                        content = ET.tostring(gpx_root, encoding='utf-8')
+                        with open(upload_path, 'wb') as f:
+                            f.write(content)
+                elif coords:
+                    pass
+
+            # 4. Traitement normal si on n'a pas encore créé le fichier
+            if not os.path.exists(upload_path):
+                # Google My Maps
+                if 'google.com/maps/d/' in target_url:
+                    if 'mid=' in target_url:
+                        mid_match = re.search(r'mid=([^&]+)', target_url)
+                        if mid_match:
+                            mid = mid_match.group(1)
+                            target_url = f"https://www.google.com/maps/d/u/0/kml?mid={mid}&forcekml=1"
+                
+                resp = requests.get(target_url, timeout=20)
+                resp.raise_for_status()
+                content = resp.content
+                
+                # Si c'est du KML, on convertit
+                if b'<kml' in content or b'</kml>' in content:
+                    set_status(task_id, 10, 'Conversion du KML en GPX...')
+                    content = kml_to_gpx(content)
+                
+                with open(upload_path, 'wb') as f:
+                    f.write(content)
+                set_status(task_id, 12, 'Tracé récupéré avec succès')
+
+        set_status(task_id, 15, 'Analyse du tracé...')
         track_points = parse_gpx_track_points(upload_path)
-        set_status(task_id, 15, 'Utilisation des points d\u2019eau préchargés...')
+        if not track_points:
+             raise ValueError("Le fichier ne contient aucun point de tracé valide.")
+
+        set_status(task_id, 20, 'Utilisation des points d\u2019eau préchargés...')
         water_points = parse_water_points()
         set_status(task_id, 25, f'{len(water_points)} points d\u2019eau disponibles')
         nearby_water = nearby_water_points(track_points, max_distance_m=500, task_id=task_id)
@@ -610,11 +797,13 @@ def home():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'gpx_file' not in request.files:
-        return jsonify({'error': 'Aucun fichier envoyé'}), 400
+    gpx_url = request.form.get('gpx_url', '').strip()
+    file = request.files.get('gpx_file')
 
-    file = request.files['gpx_file']
-    if file.filename == '' or not allowed_file(file.filename):
+    if not file and not gpx_url:
+        return jsonify({'error': 'Aucun fichier ou URL envoyé'}), 400
+
+    if file and file.filename == '':
         return jsonify({'error': 'Fichier non valide'}), 400
 
     page_name_input = request.form.get('page_name', '').strip()
@@ -635,11 +824,18 @@ def upload():
         page_name = f"{page_name}-{count}"
 
     upload_path = os.path.join(UPLOAD_FOLDER, f"{page_name}.gpx")
-    file.save(upload_path)
+    original_name = ""
+    
+    if file:
+        file.save(upload_path)
+        original_name = file.filename
+    else:
+        # On utilisera gpx_url dans le thread
+        original_name = gpx_url.split('/')[-1] or "Lien distant"
 
     task_id = str(uuid.uuid4())
-    set_status(task_id, 0, 'Fichier reçu, préparation du traitement...')
-    thread = threading.Thread(target=process_gpx_task, args=(task_id, upload_path, page_name, file.filename))
+    set_status(task_id, 0, 'Préparation du traitement...')
+    thread = threading.Thread(target=process_gpx_task, args=(task_id, upload_path, page_name, original_name, gpx_url))
     thread.daemon = True
     thread.start()
 
