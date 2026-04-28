@@ -159,8 +159,26 @@
 <body>
   <div class="container">
     <header>
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div style="padding: 8px 15px; border-radius: 20px; font-size: 0.9rem; background: rgba(255,255,255,0.9); color: #333; margin-right: auto;">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <div style="background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 30px; display: flex; align-items: center; gap: 10px; color: white;">
+          <span style="font-weight: 500;">👤 {{ user.name }}</span>
+          <a href="{{ url_for('change_password') }}" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.9rem; margin-left: 10px; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 10px;">🔑 Sécurité</a>
+          <a href="{{ url_for('logout') }}" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.9rem; margin-left: 10px; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 10px;">🚪 Déconnexion</a>
+        </div>
+      </div>
+      {% if is_dev %}
+      <div style="background: #ffeb3b; color: #333; padding: 5px 15px; border-radius: 20px; display: inline-block; font-weight: bold; margin-bottom: 10px; font-size: 0.8rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">⚠️ MODE DÉVELOPPEMENT</div>
+      {% endif %}
       <h1>🗺️ WaterMap</h1>
-      <p class="subtitle">Gérez vos itinéraires et découvrez les points d'eau à proximité</p>
+      <p class="subtitle">Gérez vos itinéraires personnels et découvrez les points d'eau</p>
     </header>
 
     <div class="card">

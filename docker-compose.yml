@@ -2,25 +2,38 @@ version: '3.8'
 
 services:
   watermap_prod:
+    build: .
     image: watermap:prod
     ports:
       - "8080:80"
+    env_file:
+      - .env
     volumes:
+      - watermap_db_prod:/app/db
       - watermap_pages_prod:/app/pages
       - watermap_uploads_prod:/app/uploads
     restart: always
 
   watermap_dev:
+    build: .
     image: watermap:dev
     ports:
       - "8081:80"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=development
     volumes:
+      - .:/app
+      - watermap_db_dev:/app/db
       - watermap_pages_dev:/app/pages
       - watermap_uploads_dev:/app/uploads
 
 volumes:
+  watermap_db_prod:
   watermap_pages_prod:
   watermap_uploads_prod:
+  watermap_db_dev:
   watermap_pages_dev:
   watermap_uploads_dev:
   

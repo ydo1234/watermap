@@ -8,18 +8,194 @@ import re
 import threading
 import uuid
 import xml.etree.ElementTree as ET
-from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify, session, flash
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from itsdangerous import URLSafeTimedSerializer as Serializer
+from flask_mail import Mail, Message
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_FOLDER = os.path.join(BASE_DIR, 'db')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 PAGE_FOLDER = os.path.join(BASE_DIR, 'pages')
-ALLOWED_EXTENSIONS = {'gpx'}
-WATER_GPX = os.path.join(BASE_DIR, 'water.gpx')
-TOILETS_GPX = os.path.join(BASE_DIR, 'toilets_all.osm.gpx')
 
+os.makedirs(DB_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PAGE_FOLDER, exist_ok=True)
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(DB_FOLDER, 'users.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configuration Email
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() in ['true', 'on', '1']
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+
+db = SQLAlchemy(app)
+mail = Mail(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
+
+@app.context_processor
+def inject_env():
+    return {'is_dev': os.environ.get('FLASK_ENV') == 'development'}
+
+# Modèle Utilisateur
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def get_reset_token(self):
+        s = Serializer(app.config['SECRET_KEY'])
+        return s.dumps({'user_id': self.id})
+
+    @staticmethod
+    def verify_reset_token(token, expires_sec=1800):
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(token, max_age=expires_sec)['user_id']
+        except:
+            return None
+        return User.query.get(user_id)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+with app.app_context():
+    db.create_all()
+
+def get_user_upload_folder(user_id):
+    path = os.path.join(UPLOAD_FOLDER, str(user_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def get_user_page_folder(user_id):
+    path = os.path.join(PAGE_FOLDER, str(user_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def send_reset_email(user):
+    token = user.get_reset_token()
+    msg = Message('Réinitialisation de votre mot de passe - WaterMap',
+                  recipients=[user.email])
+    msg.body = f'''Pour réinitialiser votre mot de passe, visitez le lien suivant :
+{url_for('reset_password', token=token, _external=True)}
+
+Si vous n'avez pas fait cette demande, ignorez simplement cet email.
+'''
+    try:
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Erreur d'envoi d'email : {e}")
+        return False
+
+# --- Routes d'Authentification ---
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if User.query.filter_by(email=email).first():
+            flash('Cet email est déjà utilisé.', 'danger')
+            return redirect(url_for('register'))
+        
+        user = User(name=name, email=email)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        flash('Inscription réussie ! Vous pouvez vous connecter.', 'success')
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('home'))
+        else:
+            flash('Email ou mot de passe incorrect.', 'danger')
+    return render_template('login.html')
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        if user:
+            # Envoi de l'email réel
+            if send_reset_email(user):
+                flash('Un email de réinitialisation vous a été envoyé.', 'success')
+            else:
+                flash('Erreur lors de l\'envoi de l\'email. Contactez l\'administrateur.', 'danger')
+            
+            # On garde le log pour faciliter les tests
+            token = user.get_reset_token()
+            reset_url = url_for('reset_password', token=token, _external=True)
+            import sys
+            print(f"\n[DEBUG] Lien de réinitialisation pour {email} :\n{reset_url}\n", file=sys.stderr, flush=True)
+        else:
+            flash('Email non trouvé.', 'danger')
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user = User.verify_reset_token(token)
+    if not user:
+        flash('Lien invalide ou expiré.', 'danger')
+        return redirect(url_for('forgot_password'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        user.set_password(password)
+        db.session.commit()
+        flash('Mot de passe mis à jour !', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html')
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        if current_user.check_password(old_password):
+            current_user.set_password(new_password)
+            db.session.commit()
+            flash('Mot de passe modifié.', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Ancien mot de passe incorrect.', 'danger')
+    return render_template('change_password.html')
 
 # Cache global pour les points d'eau
 _water_points_cache = None
@@ -103,9 +279,6 @@ def load_toilets_cache():
             print("⚠️ Fichier toilets_all.osm.gpx non trouvé")
     except Exception as e:
         print(f"❌ Erreur lors du préchargement des toilettes: {e}")
-
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max
 
 processing_status = {}
 status_lock = threading.Lock()
@@ -411,8 +584,9 @@ def kml_to_gpx(kml_content):
         raise
 
 
-def process_gpx_task(task_id, upload_path, page_name, original_name, gpx_url=None):
+def process_gpx_task(task_id, upload_path, page_name, original_name, user_id, gpx_url=None):
     try:
+        user_page_folder = get_user_page_folder(user_id)
         if gpx_url:
             set_status(task_id, 5, 'Récupération du tracé distant...')
             target_url = gpx_url
@@ -567,10 +741,10 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, gpx_url=Non
         set_status(task_id, 85, f'{len(nearby_water_filtered)} points d\u2019eau et {len(nearby_toilets_list)} toilettes trouvés')
         set_status(task_id, 90, 'Génération de la page...')
 
-        page_path = os.path.join(PAGE_FOLDER, f"{page_name}.html")
+        page_path = os.path.join(user_page_folder, f"{page_name}.html")
         page_name_html = html.escape(page_name)
         original_name_html = html.escape(original_name)
-        gpx_url = f"/uploads/{page_name}.gpx"
+        gpx_url_link = f"/uploads/{user_id}/{page_name}.gpx"
         water_points_js = ','.join([
             '{{lat:{lat},lon:{lon},name:"{name}",distance:{distance}}}'.format(
                 lat=pt['lat'], lon=pt['lon'], name=html.escape(pt['name']).replace('"', '\\"'), distance=pt['distance_m'])
@@ -758,7 +932,7 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, gpx_url=Non
       marker.addTo(toiletLayer);
     }});
 
-    new L.GPX('{gpx_url}', {{async: true}}).on('loaded', function(e) {{
+    new L.GPX('{gpx_url_link}', {{async: true}}).on('loaded', function(e) {{
       map.fitBounds(e.target.getBounds());
       const allMarkers = [];
       if (waterPoints.length || toiletPoints.length) {{
@@ -786,16 +960,28 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, gpx_url=Non
         set_status(task_id, 100, f'Erreur : {e}', done=True, error=str(e))
 
 
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('home'))
+
+
 @app.route('/')
 def home():
+    if not current_user.is_authenticated:
+        return render_template('login.html')
+    
+    user_page_folder = get_user_page_folder(current_user.id)
     pages = []
-    for filename in sorted(os.listdir(PAGE_FOLDER)):
+    for filename in sorted(os.listdir(user_page_folder)):
         if filename.endswith('.html'):
             pages.append({'name': filename[:-5]})
-    return render_template('index.html', pages=pages)
+    return render_template('index.html', pages=pages, user=current_user)
 
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload():
     gpx_url = request.form.get('gpx_url', '').strip()
     file = request.files.get('gpx_file')
@@ -810,32 +996,32 @@ def upload():
     if not page_name_input:
         return jsonify({'error': 'Le nom de la page est requis'}), 400
 
-    # Sécuriser le nom et vérifier l'unicité
     page_name = secure_filename(page_name_input)
     if not page_name:
         return jsonify({'error': 'Le nom contient des caractères invalides'}), 400
 
-    # Si le fichier existe déjà, on le numéro
-    page_path = os.path.join(PAGE_FOLDER, f"{page_name}.html")
+    user_page_folder = get_user_page_folder(current_user.id)
+    user_upload_folder = get_user_upload_folder(current_user.id)
+
+    page_path = os.path.join(user_page_folder, f"{page_name}.html")
     if os.path.exists(page_path):
         count = 1
-        while os.path.exists(os.path.join(PAGE_FOLDER, f"{page_name}-{count}.html")):
+        while os.path.exists(os.path.join(user_page_folder, f"{page_name}-{count}.html")):
             count += 1
         page_name = f"{page_name}-{count}"
 
-    upload_path = os.path.join(UPLOAD_FOLDER, f"{page_name}.gpx")
+    upload_path = os.path.join(user_upload_folder, f"{page_name}.gpx")
     original_name = ""
     
     if file:
         file.save(upload_path)
         original_name = file.filename
     else:
-        # On utilisera gpx_url dans le thread
-        original_name = gpx_url.split('/')[-1] or "Lien distant"
+        original_name = gpx_url.split('/')[-1].split('?')[0] or "Lien distant"
 
     task_id = str(uuid.uuid4())
     set_status(task_id, 0, 'Préparation du traitement...')
-    thread = threading.Thread(target=process_gpx_task, args=(task_id, upload_path, page_name, original_name, gpx_url))
+    thread = threading.Thread(target=process_gpx_task, args=(task_id, upload_path, page_name, original_name, current_user.id, gpx_url))
     thread.daemon = True
     thread.start()
 
@@ -843,6 +1029,7 @@ def upload():
 
 
 @app.route('/status/<task_id>')
+@login_required
 def status(task_id):
     status_data = get_status(task_id)
     if status_data is None:
@@ -851,22 +1038,34 @@ def status(task_id):
 
 
 @app.route('/generated/<page_name>')
+@login_required
 def page(page_name):
+    user_page_folder = get_user_page_folder(current_user.id)
     filename = secure_filename(f"{page_name}.html")
-    return send_from_directory(PAGE_FOLDER, filename)
+    if not os.path.exists(os.path.join(user_page_folder, filename)):
+        return "Page introuvable ou accès refusé", 403
+    return send_from_directory(user_page_folder, filename)
 
 
-@app.route('/uploads/<path:filename>')
-def uploaded_file(filename):
+@app.route('/uploads/<user_id>/<path:filename>')
+@login_required
+def uploaded_file(user_id, filename):
+    if user_id != current_user.id:
+        return "Accès refusé", 403
+    user_upload_folder = get_user_upload_folder(user_id)
     safe_filename = secure_filename(filename)
-    return send_from_directory(UPLOAD_FOLDER, safe_filename)
+    return send_from_directory(user_upload_folder, safe_filename)
 
 
 @app.route('/delete/<page_name>', methods=['POST'])
+@login_required
 def delete(page_name):
     safe_name = secure_filename(page_name)
-    page_path = os.path.join(PAGE_FOLDER, f"{safe_name}.html")
-    upload_path = os.path.join(UPLOAD_FOLDER, f"{safe_name}.gpx")
+    user_page_folder = get_user_page_folder(current_user.id)
+    user_upload_folder = get_user_upload_folder(current_user.id)
+    
+    page_path = os.path.join(user_page_folder, f"{safe_name}.html")
+    upload_path = os.path.join(user_upload_folder, f"{safe_name}.gpx")
 
     if os.path.exists(page_path):
         os.remove(page_path)
