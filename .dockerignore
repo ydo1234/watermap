@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!requirements.txt
+!requirements.lock
+!app.py
+!remote_fetch.py
+!templates/
+!templates/**
+!water.gpx
+!toilets_all.osm.gpx

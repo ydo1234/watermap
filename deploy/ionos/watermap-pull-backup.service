@@ -1,0 +1,10 @@
+[Unit]
+Description=Copie et contrôle des sauvegardes Watermap du VPS sur le RPi
+
+[Service]
+Type=oneshot
+User=yann
+Group=yann
+UMask=0077
+ExecStart=/usr/bin/python3 /home/yann/watermap-deployment/pull-backup.py
+TimeoutStartSec=300

@@ -1,0 +1,11 @@
+[Unit]
+Description=Sauvegarde cohérente de Watermap
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/watermap/backup.py
+ExecStopPost=-/usr/bin/python3 /opt/watermap/backup.py --resume-only
+TimeoutStartSec=180

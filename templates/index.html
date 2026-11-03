@@ -184,6 +184,7 @@
     <div class="card">
       <h2>📤 Créer une nouvelle page</h2>
       <form id="upload-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label for="page_name">Nom de la page</label>
           <input type="text" id="page_name" name="page_name" placeholder="Ex: Rando Cévennes" required>
@@ -235,6 +236,7 @@
                 <td><a href="{{ url_for('page', page_name=page.name) }}">{{ page.name }}</a></td>
                 <td style="text-align: right;">
                   <form action="{{ url_for('delete', page_name=page.name) }}" method="post" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn-delete" onclick="return confirm('Supprimer {{ page.name }} ?');">🗑️ Supprimer</button>
                   </form>
                 </td>

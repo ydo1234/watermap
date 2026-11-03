@@ -1,0 +1,9 @@
+[Unit]
+Description=Copie quotidienne des sauvegardes Watermap sur le RPi
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

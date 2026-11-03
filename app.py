@@ -15,11 +15,19 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from flask_mail import Mail, Message
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from remote_fetch import fetch_public_url
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_FOLDER = os.path.join(BASE_DIR, 'db')
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-PAGE_FOLDER = os.path.join(BASE_DIR, 'pages')
+DATA_DIR = os.environ.get('WATERMAP_DATA_DIR', BASE_DIR)
+DB_FOLDER = os.path.join(DATA_DIR, 'db')
+UPLOAD_FOLDER = os.path.join(DATA_DIR, 'uploads')
+PAGE_FOLDER = os.path.join(DATA_DIR, 'pages')
+WATER_GPX = os.path.join(BASE_DIR, 'water.gpx')
+TOILETS_GPX = os.path.join(BASE_DIR, 'toilets_all.osm.gpx')
+ALLOWED_EXTENSIONS = {'gpx'}
 
 os.makedirs(DB_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -38,6 +46,10 @@ app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() in [
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+app.config['MAIL_TIMEOUT'] = 15
+
+csrf = CSRFProtect(app)
+limiter = Limiter(get_remote_address, app=app, storage_uri='memory://')
 
 db = SQLAlchemy(app)
 mail = Mail(app)
@@ -111,6 +123,7 @@ Si vous n'avez pas fait cette demande, ignorez simplement cet email.
 # --- Routes d'Authentification ---
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit('10 per minute', methods=['POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('home'))
@@ -118,6 +131,10 @@ def register():
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
+
+        if not name or len(name) > 100 or not email or len(email) > 100 or '@' not in email or not password or len(password) < 8:
+            flash('Renseignez un nom, un email valide et un mot de passe d’au moins 8 caractères.', 'danger')
+            return redirect(url_for('register'))
         
         if User.query.filter_by(email=email).first():
             flash('Cet email est déjà utilisé.', 'danger')
@@ -132,6 +149,7 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit('10 per minute', methods=['POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('home'))
@@ -147,6 +165,7 @@ def login():
     return render_template('login.html')
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', methods=['POST'])
 def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email')
@@ -158,11 +177,6 @@ def forgot_password():
             else:
                 flash('Erreur lors de l\'envoi de l\'email. Contactez l\'administrateur.', 'danger')
             
-            # On garde le log pour faciliter les tests
-            token = user.get_reset_token()
-            reset_url = url_for('reset_password', token=token, _external=True)
-            import sys
-            print(f"\n[DEBUG] Lien de réinitialisation pour {email} :\n{reset_url}\n", file=sys.stderr, flush=True)
         else:
             flash('Email non trouvé.', 'danger')
     return render_template('forgot_password.html')
@@ -176,6 +190,9 @@ def reset_password(token):
     
     if request.method == 'POST':
         password = request.form.get('password')
+        if not password or len(password) < 8:
+            flash('Choisissez un mot de passe d’au moins 8 caractères.', 'danger')
+            return render_template('reset_password.html')
         user.set_password(password)
         db.session.commit()
         flash('Mot de passe mis à jour !', 'success')
@@ -281,6 +298,7 @@ def load_toilets_cache():
         print(f"❌ Erreur lors du préchargement des toilettes: {e}")
 
 processing_status = {}
+task_owners = {}
 status_lock = threading.Lock()
 
 load_existing_pages()
@@ -593,7 +611,7 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, user_id, gp
             
             # 1. Résolution des liens raccourcis
             if 'maps.app.goo.gl' in target_url or 'goo.gl/maps' in target_url:
-                resp = requests.head(target_url, allow_redirects=True, timeout=10)
+                resp = fetch_public_url(target_url, method='HEAD', timeout=10)
                 target_url = resp.url
             
             # 2. Gestion de la page de consentement Google
@@ -704,8 +722,7 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, user_id, gp
                             mid = mid_match.group(1)
                             target_url = f"https://www.google.com/maps/d/u/0/kml?mid={mid}&forcekml=1"
                 
-                resp = requests.get(target_url, timeout=20)
-                resp.raise_for_status()
+                resp = fetch_public_url(target_url, timeout=20)
                 content = resp.content
                 
                 # Si c'est du KML, on convertit
@@ -982,6 +999,7 @@ def home():
 
 @app.route('/upload', methods=['POST'])
 @login_required
+@limiter.limit('5 per minute', methods=['POST'])
 def upload():
     gpx_url = request.form.get('gpx_url', '').strip()
     file = request.files.get('gpx_file')
@@ -1020,6 +1038,14 @@ def upload():
         original_name = gpx_url.split('/')[-1].split('?')[0] or "Lien distant"
 
     task_id = str(uuid.uuid4())
+    with status_lock:
+        # Keep a bounded history of completed task results in this single worker.
+        if len(task_owners) >= 1000:
+            for previous in list(task_owners):
+                if processing_status.get(previous, {}).get('done'):
+                    task_owners.pop(previous, None)
+                    processing_status.pop(previous, None)
+        task_owners[task_id] = current_user.id
     set_status(task_id, 0, 'Préparation du traitement...')
     thread = threading.Thread(target=process_gpx_task, args=(task_id, upload_path, page_name, original_name, current_user.id, gpx_url))
     thread.daemon = True
@@ -1031,6 +1057,9 @@ def upload():
 @app.route('/status/<task_id>')
 @login_required
 def status(task_id):
+    with status_lock:
+        if task_owners.get(task_id) != current_user.id:
+            return jsonify({'error': 'Tâche introuvable'}), 404
     status_data = get_status(task_id)
     if status_data is None:
         return jsonify({'error': 'Tâche introuvable'}), 404
@@ -1047,7 +1076,7 @@ def page(page_name):
     return send_from_directory(user_page_folder, filename)
 
 
-@app.route('/uploads/<user_id>/<path:filename>')
+@app.route('/uploads/<int:user_id>/<path:filename>')
 @login_required
 def uploaded_file(user_id, filename):
     if user_id != current_user.id:

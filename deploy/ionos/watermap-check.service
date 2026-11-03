@@ -1,0 +1,9 @@
+[Unit]
+Description=Vérification de disponibilité HTTPS de Watermap
+
+[Service]
+Type=oneshot
+User=yann
+Group=yann
+ExecStart=/usr/bin/python3 /home/yann/watermap-deployment/check-site.py
+TimeoutStartSec=30

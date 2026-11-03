@@ -2,6 +2,11 @@
 
 Ce projet est un serveur web Python/Flask qui permet de trouver les points d'eau et les toilettes à proximité d'un tracé GPX ou d'un itinéraire Google Maps.
 
+## Production
+
+L'application est déployée sur **https://watermap.dolisi.fr** avec comptes utilisateur et HTTPS.
+La configuration du VPS IONOS, les versions verrouillées, les sauvegardes et la procédure de reconstruction sont documentées dans [deploy/ionos/README.md](deploy/ionos/README.md).
+
 ## 🚀 Utilisation avec Docker
 
 1. **Construire l'image** :

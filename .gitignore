@@ -1,6 +1,9 @@
 # Secrets
 .env
+runtime.env
 *.db
+*.db-wal
+*.db-shm
 
 # Python
 __pycache__/
@@ -15,3 +18,10 @@ pages/*/
 
 # Docker
 .docker/
+
+# Déploiement et sauvegardes privées
+/deploy/ionos/data/
+/deploy/ionos/source/
+/deploy/ionos/vps-backups/
+/deploy/ionos/*.tar.gz
+/dist/

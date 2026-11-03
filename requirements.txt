@@ -1,7 +1,10 @@
-Flask>=2.3.3
-Werkzeug<3.0.0
-gunicorn>=20.1.0
-requests>=2.31.0
-Flask-Login>=0.6.3
-Flask-SQLAlchemy>=3.0.5
-Flask-Mail>=0.9.1
+Flask>=3.1,<4
+Werkzeug>=3.1,<4
+gunicorn>=23,<30
+requests>=2.32.4,<3
+urllib3>=2.6,<3
+Flask-Login>=0.6.3,<0.7
+Flask-SQLAlchemy>=3.1.1,<4
+Flask-Mail>=0.10,<1
+Flask-WTF>=1.2,<2
+Flask-Limiter>=4,<5
