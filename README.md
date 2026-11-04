@@ -20,7 +20,7 @@ docker compose up -d --build --wait --wait-timeout 90 watermap_dev
 docker compose ps watermap_dev
 ```
 
-Ouvrir **http://localhost:8081 sur le RPi**. Le service écoute uniquement sur la boucle locale. Pour y accéder depuis un autre poste, utiliser un tunnel SSH ou définir explicitement `WATERMAP_DEV_BIND` sur l'adresse LAN/Tailscale du RPi. Dans ce cas, `WATERMAP_DEV_PUBLIC_URL` doit correspondre à l'URL utilisée pour la recette. Le service n'est pas destiné à être exposé directement sur Internet.
+Depuis le poste Windows de Yann, ouvrir **http://rpi4ng:8081**. Depuis le RPi, **http://localhost:8081** fonctionne également. La recette écoute sur toutes les interfaces IPv4 (`WATERMAP_DEV_BIND=0.0.0.0`) : Ethernet, Wi-Fi et Tailscale. Éviter une publication sur une seule adresse LAN : le nom `rpi4ng` peut être résolu vers une autre interface et provoquer des refus de connexion. `WATERMAP_DEV_PUBLIC_URL` doit correspondre à l'URL utilisée pour la recette ; sur cette installation, elle vaut `http://rpi4ng:8081`. Le service n'est pas destiné à être exposé directement sur Internet. Pour limiter volontairement l'accès à un tunnel SSH, définir `WATERMAP_DEV_BIND=127.0.0.1`.
 
 L'image fonctionne avec l'UID/GID 10001 ; le code est monté en lecture seule et seuls les trois volumes de données et `/tmp` sont inscriptibles. Les anciens volumes créés par root nécessitent une sauvegarde puis une adaptation des droits à 10001 avant le premier démarrage. Cette adaptation a été faite sur les volumes dev du RPi le 4 novembre 2026 ; aucun volume de production n'a été modifié.
 
