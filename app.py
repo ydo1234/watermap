@@ -199,11 +199,11 @@ def valid_password(password):
 def security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-    # OSM tiles require a Referer. Share only the origin from map pages; keep
-    # recovery tokens and all other pages from sending any referrer.
+    # HTTPS CSRF checks require a same-origin Referer. Send only the origin
+    # on forms so recovery tokens and private paths remain undisclosed.
     response.headers['Referrer-Policy'] = (
         'strict-origin-when-cross-origin'
-        if request.endpoint == 'page' and response.status_code == 200 else 'no-referrer'
+        if request.endpoint == 'page' and response.status_code == 200 else 'strict-origin'
     )
     response.headers['Cache-Control'] = 'private, no-store'
     response.headers['Content-Security-Policy'] = (

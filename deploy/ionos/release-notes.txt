@@ -1,14 +1,10 @@
-Une nouvelle version de Watermap est en ligne.
+Une correction de la connexion HTTPS vient d’être appliquée à Watermap.
 
-Cette mise à jour apporte :
-- une connexion et une gestion des mots de passe renforcées ;
-- une recherche des points d'eau et des toilettes plus précise lors des nouveaux imports, en suivant les segments complets du parcours ;
-- la prise en compte de la distance de recherche choisie ;
-- des corrections de l'affichage des cartes et une meilleure maîtrise des traitements GPX.
+Elle corrige l’erreur 400 qui pouvait apparaître lors de l’envoi des formulaires de connexion ou de récupération du mot de passe. La protection des comptes et de vos données reste active.
 
-Vos comptes, mots de passe et itinéraires existants sont conservés. Une reconnexion peut être nécessaire après cette mise à jour.
+Vous pouvez vous connecter ici : https://watermap.dolisi.fr
 
-Retrouvez Watermap ici : https://watermap.dolisi.fr
+Vos comptes, mots de passe et itinéraires sont conservés.
 
 Bonne route,
 Watermap

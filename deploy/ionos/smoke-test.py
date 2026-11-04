@@ -31,13 +31,21 @@ def main():
         def get(path, browser=client):
             return browser.get(path, base_url=BASE)
 
-        def token(path='/', browser=client):
+        def form(path='/', browser=client):
             response = get(path, browser)
             assert response.status_code == 200, (path, response.status_code)
-            return re.search(rb'name="csrf_token" value="([^"]+)"', response.data).group(1).decode()
+            csrf_token = re.search(rb'name="csrf_token" value="([^"]+)"', response.data).group(1).decode()
+            # Follow the document policy as a browser would. Forcing Referer
+            # independently of it previously hid HTTPS-only CSRF regressions.
+            headers = {} if response.headers.get('Referrer-Policy') == 'no-referrer' else {'Referer': BASE+'/'}
+            return csrf_token, headers
+
+        def token(path='/', browser=client):
+            return form(path,browser)[0]
 
         def post(path, data=None, browser=client):
-            return browser.post(path, data={'csrf_token': token(browser=browser), **(data or {})}, base_url=BASE, headers={'Referer': BASE+'/'})
+            csrf_token, headers = form(browser=browser)
+            return browser.post(path, data={'csrf_token':csrf_token, **(data or {})}, base_url=BASE, headers=headers)
 
         assert get('/').status_code == 200
         assert get('/generated/absent').status_code == 302
@@ -82,7 +90,8 @@ def main():
             send.assert_called_once()
             assert BASE+'/reset-password/' in send.call_args.args[0].body
         reset_path = '/reset-password/'+reset
-        response = client.post(reset_path,base_url=BASE,headers={'Referer':BASE+'/'},data={'csrf_token':token(reset_path),'password':'new-valid-password-123'})
+        reset_csrf, reset_headers = form(reset_path)
+        response = client.post(reset_path,base_url=BASE,headers=reset_headers,data={'csrf_token':reset_csrf,'password':'new-valid-password-123'})
         assert response.status_code == 302
         assert get('/change-password').status_code == 302
         with app.app_context():

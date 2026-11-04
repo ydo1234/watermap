@@ -16,7 +16,7 @@ def test_headers_csrf_logout(client, module, owner):
     response = client.get('/')
     assert response.headers['Cache-Control'] == 'private, no-store'
     assert response.headers['X-Content-Type-Options'] == 'nosniff'
-    assert response.headers['Referrer-Policy'] == 'no-referrer'
+    assert response.headers['Referrer-Policy'] == 'strict-origin'
     assert "frame-ancestors 'self'" in response.headers['Content-Security-Policy']
     assert client.get('/logout').status_code == 405
     assert client.post('/logout').status_code == 400
@@ -300,6 +300,46 @@ def test_map_uses_origin_referrer_without_exposing_private_path(module, client, 
     assert b'https://www.openstreetmap.org/copyright' in response.data
     image_policy = response.headers['Content-Security-Policy'].split('img-src', 1)[1].split(';', 1)[0].split()
     assert 'https://tile.openstreetmap.org' in image_policy
-    assert client.get('/').headers['Referrer-Policy'] == 'no-referrer'
+    assert client.get('/').headers['Referrer-Policy'] == 'strict-origin'
     reset_path = '/reset-password/' + owner.get_reset_token()
-    assert client.get(reset_path).headers['Referrer-Policy'] == 'no-referrer'
+    assert client.get(reset_path).headers['Referrer-Policy'] == 'strict-origin'
+
+
+@pytest.mark.parametrize('page_path,target,expected', [('/', '/login', 302),('/login','/login',302),('/register','/register',302),('/forgot-password','/forgot-password',200)])
+def test_https_forms_follow_document_referrer_policy(module,client,page_path,target,expected):
+    import re
+    account(module)
+    base='https://watermap.example'
+    page=client.get(page_path,base_url=base)
+    token=re.search(rb'name="csrf_token" value="([^"]+)"',page.data).group(1).decode()
+    headers={} if page.headers.get('Referrer-Policy')=='no-referrer' else {'Referer':base+'/'}
+    email='new@example.test' if target=='/register' else 'owner@example.test'
+    if target=='/forgot-password':
+        email='missing@example.test'
+    response=client.post(target,base_url=base,headers=headers,data={'csrf_token':token,'name':'HTTPS','email':email,'password':'valid-password-123'})
+    assert response.status_code==expected,response.data
+    assert module.app.config['WTF_CSRF_SSL_STRICT'] is True
+
+
+def test_https_reset_keeps_token_private_and_can_submit(module,client):
+    import re
+    user=account(module)
+    base='https://watermap.example'
+    path='/reset-password/'+user.get_reset_token()
+    page=client.get(path,base_url=base)
+    token=re.search(rb'name="csrf_token" value="([^"]+)"',page.data).group(1).decode()
+    policy=page.headers.get('Referrer-Policy')
+    headers={} if policy=='no-referrer' else {'Referer':base+'/'}
+    response=client.post(path,base_url=base,headers=headers,data={'csrf_token':token,'password':'new-https-password'})
+    assert response.status_code==302,response.data
+    assert policy=='strict-origin'
+
+
+def test_https_rejects_missing_and_foreign_referrers(module,client):
+    import re
+    base='https://watermap.example'
+    page=client.get('/login',base_url=base)
+    token=re.search(rb'name="csrf_token" value="([^"]+)"',page.data).group(1).decode()
+    payload={'csrf_token':token,'email':'unknown@example.test','password':'wrong'}
+    assert client.post('/login',base_url=base,data=payload).status_code==400
+    assert client.post('/login',base_url=base,headers={'Referer':'https://attacker.invalid/'},data=payload).status_code==400
