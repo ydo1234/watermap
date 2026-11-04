@@ -1,0 +1,18 @@
+[Unit]
+Description=Restrict Watermap staging IPv6 to LAN and Tailscale
+Wants=network-online.target
+After=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/libexec/watermap-stag-ipv6.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+CapabilityBoundingSet=CAP_NET_ADMIN
+RestrictAddressFamilies=AF_NETLINK AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

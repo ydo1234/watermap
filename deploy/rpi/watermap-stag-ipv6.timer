@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Watermap staging IPv6 LAN prefixes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=10s
+Unit=watermap-stag-ipv6.service
+
+[Install]
+WantedBy=timers.target
