@@ -73,7 +73,7 @@ def main():
         with tarfile.open(partial, 'x:gz') as archive:
             archive.add(saved, arcname='data')
             archive.add(manifest_path, arcname='manifest.json')
-            for item in ('source', 'compose.yaml', 'Caddyfile', 'runtime.env', 'requirements.lock', 'backup.py', 'watermap-backup.service', 'watermap-backup.timer', 'README.md'):
+            for item in ('source', 'compose.yaml', 'Caddyfile', 'runtime.env', 'requirements.lock', 'backup.py', 'watermap-backup.service', 'watermap-backup.timer', 'README.md', 'release.json', 'notify-release.py', 'release-notes.txt'):
                 path = ROOT / item
                 if path.exists():
                     archive.add(path, arcname=item)

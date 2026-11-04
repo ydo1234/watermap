@@ -26,7 +26,7 @@ def main():
     for name in ('Dockerfile', 'wsgi.py', '.dockerignore'):
         shutil.copy2(config / name, source / name)
     for name in ('compose.yaml', 'Caddyfile', 'backup.py', 'bootstrap-vps.sh', 'README.md', 'runtime.env.example',
-                 'smoke-test.py', 'check-live.py', 'check-smtp.py', 'watermap-backup.service', 'watermap-backup.timer'):
+                 'smoke-test.py', 'check-live.py', 'check-smtp.py', 'notify-release.py', 'release-notes.txt', 'watermap-backup.service', 'watermap-backup.timer'):
         shutil.copy2(config / name, destination / name)
     shutil.copy2(repository / 'requirements.lock', destination / 'requirements.lock')
     commit = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', 'HEAD'], text=True).strip()

@@ -1,0 +1,14 @@
+Une nouvelle version de Watermap est en ligne.
+
+Cette mise à jour apporte :
+- une connexion et une gestion des mots de passe renforcées ;
+- une recherche des points d'eau et des toilettes plus précise lors des nouveaux imports, en suivant les segments complets du parcours ;
+- la prise en compte de la distance de recherche choisie ;
+- des corrections de l'affichage des cartes et une meilleure maîtrise des traitements GPX.
+
+Vos comptes, mots de passe et itinéraires existants sont conservés. Une reconnexion peut être nécessaire après cette mise à jour.
+
+Retrouvez Watermap ici : https://watermap.dolisi.fr
+
+Bonne route,
+Watermap

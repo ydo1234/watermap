@@ -58,3 +58,11 @@ La base et le mot de passe du compte existant ont été conservés à la bascule
 Le conteneur d'origine du RPi `watermap-watermap_prod-1` est arrêté, sa politique de redémarrage est désactivée et ses volumes sont conservés. Après des écritures sur le VPS, récupérer les dernières données avant tout retour au RPi pour éviter leur perte.
 
 Pour restaurer une archive, arrêter l'application, conserver une copie des données actuelles et préparer la restauration dans un dossier distinct. Vérifier le manifeste et SQLite, puis remettre en place les données, le code et la configuration archivés. Rétablir l'UID/GID 10001 sur les données, reconstruire l'image si nécessaire et redémarrer Compose. Contrôler ensuite connexion, carte, GPX et HTTPS. Les certificats peuvent être réémis si le domaine et les ports publics sont disponibles.
+
+## Annonce de mise en production
+
+Après succès des contrôles réels, `notify-release.py` envoie individuellement les notes de `release-notes.txt` aux seuls utilisateurs de la base de production. Le script exige le point d'entrée WSGI de production, l'URL canonique HTTPS, les cookies Secure et l'envoi SMTP réellement activé. Il n'est pas exécuté sur le RPi de recette.
+
+`release.json` fournit l'identifiant exact du commit. Le registre privé `data/db/release-mailings.sqlite3` suit chaque couple version/utilisateur ; une livraison réussie n'est pas réexpédiée lors d'une relance. Les erreurs SMTP dont l'acceptation est incertaine demandent une vérification avant toute réexpédition. Une panne SMTP ne provoque pas le retour arrière d'une production saine. Les adresses des destinataires et les secrets ne sont pas imprimés.
+
+Le mode sans `--send` indique seulement le nombre de destinataires de production. Pour un envoi autorisé, monter le manifeste et les notes dans le conteneur applicatif réel et appeler le script avec `--manifest`, `--notes` et `--send`. Conserver le registre lors des déploiements et dans les sauvegardes.
