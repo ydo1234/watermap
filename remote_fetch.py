@@ -1,6 +1,7 @@
 """Fetch public GPX/Google URLs without allowing access to private networks."""
 import ipaddress
 import socket
+import time
 from typing import NamedTuple
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
@@ -12,8 +13,13 @@ class RemoteResponse(NamedTuple):
     content: bytes
 
 
-def fetch_public_url(url, method='GET', timeout=20, max_bytes=100 * 1024 * 1024):
+def fetch_public_url(url, method='GET', timeout=20, max_bytes=20 * 1024 * 1024):
+    if method not in ('GET', 'HEAD'):
+        raise ValueError('Méthode HTTP non autorisée.')
+    deadline = time.monotonic() + 45
     for _ in range(6):
+        if len(url) > 4096 or time.monotonic() >= deadline:
+            raise ValueError('Le lien est trop long ou le téléchargement a expiré.')
         parsed = urlsplit(url)
         if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError('Le lien doit être une adresse HTTP ou HTTPS publique.')
@@ -22,12 +28,12 @@ def fetch_public_url(url, method='GET', timeout=20, max_bytes=100 * 1024 * 1024)
             raise ValueError('Le lien doit utiliser un port HTTP ou HTTPS standard.')
         hostname = parsed.hostname.encode('idna').decode('ascii')
         addresses = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
-        if not addresses or any(not ipaddress.ip_address(item[4][0]).is_global for item in addresses):
+        if not addresses or any(not ipaddress.ip_address(item[4][0]).is_global or ipaddress.ip_address(item[4][0]).is_multicast for item in addresses):
             raise ValueError('Les adresses locales et privées ne sont pas autorisées.')
         # Connect directly to the checked IP so a second DNS lookup cannot change the destination.
         addresses.sort(key=lambda item: item[0] != socket.AF_INET)
         address = addresses[0][4][0]
-        options = {'timeout': urllib3.Timeout(connect=5, read=timeout), 'maxsize': 1}
+        options = {'timeout': urllib3.Timeout(connect=5, read=min(timeout, max(0.1, deadline-time.monotonic()))), 'maxsize': 1}
         if parsed.scheme == 'https':
             pool = urllib3.HTTPSConnectionPool(address, port, server_hostname=hostname, assert_hostname=hostname, **options)
         else:
@@ -38,7 +44,7 @@ def fetch_public_url(url, method='GET', timeout=20, max_bytes=100 * 1024 * 1024)
         path = urlunsplit(('', '', parsed.path or '/', parsed.query, ''))
         response = None
         try:
-            response = pool.request(method, path, headers={'Host': host_header, 'User-Agent': 'WaterMap/1.0'},
+            response = pool.request(method, path, headers={'Host': host_header, 'User-Agent': 'WaterMap/1.0', 'Accept-Encoding': 'identity'},
                                     redirect=False, retries=False, preload_content=False)
             if response.status in (301, 302, 303, 307, 308):
                 location = response.headers.get('Location')
@@ -48,10 +54,24 @@ def fetch_public_url(url, method='GET', timeout=20, max_bytes=100 * 1024 * 1024)
                 continue
             if response.status >= 400:
                 raise ValueError(f'Le serveur distant a répondu HTTP {response.status}.')
-            content = b'' if method == 'HEAD' else response.read(max_bytes + 1, decode_content=True)
-            if len(content) > max_bytes:
+            if method == 'HEAD':
+                return RemoteResponse(url, b'')
+            if response.headers.get('Content-Encoding', 'identity').lower() not in ('identity', ''):
+                raise ValueError('Le serveur distant a envoyé une compression non autorisée.')
+            length = response.headers.get('Content-Length')
+            if length and int(length) > max_bytes:
                 raise ValueError('Le fichier distant dépasse la taille maximale autorisée.')
-            return RemoteResponse(url, content)
+            content = bytearray()
+            while True:
+                if time.monotonic() >= deadline:
+                    raise ValueError('Le téléchargement distant a expiré.')
+                chunk = response.read1(min(64 * 1024, max_bytes + 1 - len(content)), decode_content=False)
+                if not chunk:
+                    break
+                content.extend(chunk)
+                if len(content) > max_bytes:
+                    raise ValueError('Le fichier distant dépasse la taille maximale autorisée.')
+            return RemoteResponse(url, bytes(content))
         finally:
             if response is not None:
                 response.close()

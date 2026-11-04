@@ -58,13 +58,16 @@ def main():
             else:
                 raise RuntimeError('The application did not recover after the snapshot')
         connection = sqlite3.connect(saved / 'db/users.db')
-        assert connection.execute('pragma integrity_check').fetchone()[0] == 'ok'
+        connection.execute('pragma wal_checkpoint(TRUNCATE)')
+        if connection.execute('pragma integrity_check').fetchone()[0] != 'ok':
+            raise RuntimeError('SQLite integrity check failed')
         users = connection.execute('select count(*) from user').fetchone()[0]
         connection.close()
         manifest = {'timestamp': stamp, 'users': users, 'files': {}}
         for path in sorted(saved.rglob('*')):
             if path.is_file():
-                manifest['files'][str(Path('data') / path.relative_to(saved))] = hashlib.sha256(path.read_bytes()).hexdigest()
+                with path.open('rb') as source:
+                    manifest['files'][str(Path('data') / path.relative_to(saved))] = hashlib.file_digest(source, 'sha256').hexdigest()
         manifest_path = Path(temp) / 'manifest.json'
         manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
         with tarfile.open(partial, 'x:gz') as archive:

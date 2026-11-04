@@ -1,39 +1,43 @@
-version: '3.8'
-
+# RPi development and acceptance testing only. VPS releases use deploy/ionos.
 services:
-  watermap_prod:
-    build: .
-    image: watermap:prod
-    ports:
-      - "8080:80"
-    env_file:
-      - .env
-    volumes:
-      - watermap_db_prod:/app/db
-      - watermap_pages_prod:/app/pages
-      - watermap_uploads_prod:/app/uploads
-    restart: always
-
   watermap_dev:
     build: .
     image: watermap:dev
     ports:
-      - "8081:80"
+      - "${WATERMAP_DEV_BIND:-127.0.0.1}:8081:8000"
     env_file:
-      - .env
+      - path: .env
+        format: raw
     environment:
-      - FLASK_ENV=development
+      FLASK_ENV: development
+      WATERMAP_PUBLIC_URL: "${WATERMAP_DEV_PUBLIC_URL:-http://localhost:8081}"
+      # Acceptance tests must not send real recovery emails by default.
+      MAIL_SUPPRESS_SEND: "${WATERMAP_DEV_MAIL_SUPPRESS_SEND:-true}"
     volumes:
-      - .:/app
+      - .:/app:ro
       - watermap_db_dev:/app/db
       - watermap_pages_dev:/app/pages
       - watermap_uploads_dev:/app/uploads
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1200m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/login', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  watermap_db_prod:
-  watermap_pages_prod:
-  watermap_uploads_prod:
   watermap_db_dev:
   watermap_pages_dev:
   watermap_uploads_dev:
-  

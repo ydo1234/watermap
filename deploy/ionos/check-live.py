@@ -12,10 +12,10 @@ with app.app_context():
     owner = db.session.execute(db.select(User).order_by(User.id)).scalars().first()
     assert owner is not None
     user_id = owner.id
-    cookie = app.session_interface.get_signing_serializer(app).dumps({'_user_id': str(user_id), '_fresh': True})
+    cookie = app.session_interface.get_signing_serializer(app).dumps({'_user_id': owner.get_id(), '_fresh': True})
 pages = sorted((Path(PAGE_FOLDER) / str(user_id)).glob('*.html'))
 uploads = sorted((Path(UPLOAD_FOLDER) / str(user_id)).glob('*.gpx'))
-assert len(pages) >= 9 and len(uploads) >= 10
+assert pages and uploads, 'Le contrôle nécessite au moins une carte et un GPX dans le compte propriétaire.'
 anonymous = requests.get(base + '/generated/' + pages[0].stem, allow_redirects=False, timeout=10)
 assert anonymous.status_code == 302 and '/login' in anonymous.headers['Location']
 session = requests.Session()

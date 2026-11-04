@@ -4,6 +4,8 @@
 !requirements.lock
 !app.py
 !remote_fetch.py
+!gpx_utils.py
+!spatial.py
 !templates/
 !templates/**
 !water.gpx

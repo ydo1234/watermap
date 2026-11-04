@@ -15,6 +15,7 @@ app.config.update(
     REMEMBER_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_SAMESITE="Lax",
     TRUSTED_HOSTS=["watermap.dolisi.fr", "localhost", "127.0.0.1"],
+    PUBLIC_BASE_URL="https://watermap.dolisi.fr",
 )
 
 

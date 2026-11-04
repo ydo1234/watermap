@@ -25,3 +25,8 @@ pages/*/
 /deploy/ionos/vps-backups/
 /deploy/ionos/*.tar.gz
 /dist/
+
+# Tests et audits locaux
+.pytest_cache/
+.coverage
+htmlcov/

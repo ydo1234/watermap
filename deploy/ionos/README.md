@@ -4,7 +4,9 @@ Watermap est servi sur https://watermap.dolisi.fr depuis `/opt/watermap` sur le 
 
 ## Préparer une version
 
-Depuis la racine du dépôt, préparer un **nouveau** répertoire extérieur au dépôt :
+La branche `dev` reste sur le Raspberry Pi pour la recette. Après validation par Yann, fusionner `dev` dans `main`. Seule une version de `main` est déployée sur le VPS.
+
+Depuis la racine du dépôt sur `main`, préparer un **nouveau** répertoire extérieur au dépôt :
 
 ```bash
 python3 deploy/ionos/prepare-release.py /tmp/watermap-release
@@ -18,20 +20,22 @@ Le répertoire généré ne contient ni secrets ni données utilisateur. Sur une
 
 ## Construire et déployer
 
-Transférer les fichiers préparés dans `/opt/watermap`, après avoir sauvegardé l'installation existante. Sur le VPS, toutes les commandes suivantes se lancent dans ce répertoire. Le test utilise une copie temporaire des données et ne modifie pas les comptes réels :
+Transférer les fichiers préparés dans `/opt/watermap`, après avoir sauvegardé l'installation existante. Sur le VPS, toutes les commandes suivantes se lancent dans ce répertoire. Le test utilise des comptes et données temporaires et ne modifie pas les comptes réels :
 
 ```bash
 cd /opt/watermap
 docker compose config --quiet
 docker compose build app
-docker compose run --rm -T --no-deps -v /opt/watermap/smoke-test.py:/tmp/smoke-test.py:ro app python /tmp/smoke-test.py
+docker run --rm --read-only --tmpfs /tmp:size=768m,mode=1777 --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 -v /opt/watermap/smoke-test.py:/tmp/smoke-test.py:ro watermap-ionos:production python /tmp/smoke-test.py
 docker compose up -d --wait --wait-timeout 90
 docker compose ps
 ```
 
-Le test de migration `smoke-test.py` correspond à l'état initial de la bascule : un compte existant, neuf pages et dix GPX. Après de nouvelles inscriptions ou de nouveaux imports, adapter ces attentes à une copie de test. Les routes d'inscription, connexion, CSRF, isolation des comptes, import, génération d'une carte, téléchargement, suppression et réinitialisation sont vérifiées ; l'envoi de courriel y est simulé.
+Le test `smoke-test.py` fonctionne indépendamment du nombre de comptes et de fichiers existants. Les routes d'inscription, connexion, CSRF, isolation des comptes, import, génération d'une carte, téléchargement, suppression et réinitialisation à usage unique sont vérifiées ; l'envoi de courriel y est simulé. L'espace temporaire de 768 Mo permet de tester le contrôle de réserve disque sans toucher aux volumes réels.
 
-`check-live.py` contrôle l'accès au compte propriétaire et à ses fichiers via HTTPS sans imprimer le cookie de session. `check-smtp.py` vérifie les identifiants SMTP et TLS sans envoyer de message. Ces vérifications s'exécutent comme le test ci-dessus, avec le script concerné monté dans `/tmp`.
+La clé `SECRET_KEY` doit comporter au moins 32 caractères aléatoires ; conserver la clé de production existante. La mise à jour invalide les anciennes sessions et les anciens liens de réinitialisation : les utilisateurs doivent se reconnecter. Le schéma des comptes et les mots de passe sont conservés ; un index SQLite sur les adresses email est ajouté. Les nouvelles cartes utilisent tous les segments du tracé. Les anciennes cartes HTML conservent leurs résultats historiques et peuvent être recréées depuis leurs GPX pour bénéficier du calcul corrigé.
+
+`check-live.py` contrôle l'accès au compte propriétaire et à ses fichiers via HTTPS sans imprimer le cookie de session. `check-smtp.py` vérifie les identifiants SMTP et TLS sans envoyer de message. Ces deux contrôles nécessitent la configuration et les volumes réels : les exécuter avec `docker compose run --rm -T --no-deps -v /opt/watermap/check-live.py:/tmp/check-live.py:ro app python /tmp/check-live.py` (ou `check-smtp.py`). Ne pas utiliser le conteneur isolé sans volumes du test précédent pour ces contrôles.
 
 Le conteneur applicatif utilise l'UID 10001, un système de fichiers protégé en écriture, un worker Gunicorn et quatre threads. Un seul worker conserve en mémoire le suivi des tâches GPX. Le socket de contrôle Gunicorn est désactivé. Les données sont montées depuis `data/` ; les secrets sont injectés au lancement et sont exclus de l'image.
 
