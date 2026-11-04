@@ -253,3 +253,30 @@ def test_generated_page_size_limit_cleans_files(module,client,owner,monkeypatch)
     assert not Path(module.get_user_page_folder(owner.id),'oversize.html').exists()
     assert not Path(module.get_user_page_folder(owner.id),'oversize.html.tmp').exists()
     assert not Path(module.get_user_upload_folder(owner.id),'oversize.gpx').exists()
+
+
+@pytest.mark.parametrize('entry_path', ['/', '/login'])
+def test_browser_login_from_rendered_form(module, client, entry_path):
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin
+
+    class LoginForm(HTMLParser):
+        def handle_starttag(self, tag, attributes):
+            values = dict(attributes)
+            if tag == 'form':
+                self.action = values.get('action', entry_path)
+            if tag == 'input' and values.get('name') == 'csrf_token':
+                self.csrf = values['value']
+
+    account(module)
+    response = client.get(entry_path)
+    form = LoginForm()
+    form.feed(response.get_data(as_text=True))
+    response = client.post(urljoin(entry_path, form.action), data={
+        'csrf_token': form.csrf,
+        'email': 'owner@example.test',
+        'password': 'valid-password-123',
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert response.request.path == '/'
+    assert 'Mes pages' in response.get_data(as_text=True)
