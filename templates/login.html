@@ -8,7 +8,7 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -50,6 +50,7 @@
 <body>
   <div class="card">
     <h1>🗺️ Connexion</h1>
+    {% include 'announcements.html' %}
     
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}

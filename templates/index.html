@@ -170,6 +170,7 @@
         
         <div style="background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 30px; display: flex; align-items: center; gap: 10px; color: white;">
           <span style="font-weight: 500;">👤 {{ user.name }}</span>
+          {% if user.is_admin %}<a href="{{ url_for('admin') }}" style="color: white;">Administration</a>{% endif %}
           <a href="{{ url_for('change_password') }}" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.9rem; margin-left: 10px; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 10px;">🔑 Sécurité</a>
           <form action="{{ url_for('logout') }}" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -183,6 +184,7 @@
       <h1>🗺️ WaterMap</h1>
       <p class="subtitle">Gérez vos itinéraires personnels et découvrez les points d'eau</p>
     </header>
+    {% include 'announcements.html' %}
 
     <div class="card">
       <h2>📤 Créer une nouvelle page</h2>

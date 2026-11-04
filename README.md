@@ -54,3 +54,15 @@ docker run --rm --read-only --tmpfs /tmp:size=768m,mode=1777 --cap-drop ALL --se
 ```
 
 Le rapport de l'audit est dans [docs/audit-2026-11-04.md](docs/audit-2026-11-04.md).
+
+## Administration et annonces
+
+La branche de travail `dev-admin`, issue de `dev`, ajoute un espace réservé aux
+administrateurs pour préparer des messages libres, des annonces d’indisponibilité
+et des modèles de mise à jour modifiables. Les brouillons peuvent être publiés à
+l’accueil et sur la page de connexion, puis envoyés individuellement par courriel
+avec confirmation et suivi des tentatives. La simulation de recette ne contacte
+pas SMTP. L’annonce d’indisponibilité ne bloque pas le service.
+
+L’attribution des droits, le fonctionnement des deux canaux et la reprise des
+envois sont décrits dans [docs/administration.md](docs/administration.md).

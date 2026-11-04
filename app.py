@@ -13,10 +13,12 @@ import time
 import uuid
 # XML generation only. All input parsing below uses defusedxml.
 import xml.etree.ElementTree as ET  # nosec B405
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+import click
 from concurrent.futures import ThreadPoolExecutor
 from defusedxml import ElementTree as SafeET
-from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify, session, flash, g
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify, session, flash, g, abort
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -102,6 +104,10 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
 
+    @property
+    def is_admin(self):
+        return db.session.get(AdminAccess, self.id) is not None
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -133,6 +139,60 @@ class User(UserMixin, db.Model):
         except (BadSignature, KeyError, TypeError, ValueError):
             return None
         return None
+
+class AdminAccess(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
+
+
+class Announcement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    kind = db.Column(db.String(20), nullable=False, default='message')
+    scheduled_for = db.Column(db.String(16), nullable=False, default='')
+    duration = db.Column(db.String(80), nullable=False, default='')
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    published = db.Column(db.Boolean, nullable=False, default=False)
+    locked = db.Column(db.Boolean, nullable=False, default=False)
+    mail_prepared = db.Column(db.Boolean, nullable=False, default=False)
+    mail_simulated = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class AnnouncementDelivery(db.Model):
+    announcement_id = db.Column(db.Integer, db.ForeignKey('announcement.id'), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
+    email = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+
+
+def admin_required(view):
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if not current_user.is_admin:
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.cli.command('admin-user')
+@click.argument('email')
+@click.option('--revoke', is_flag=True, help='Retirer les droits administrateur.')
+def admin_user(email, revoke):
+    """Accorder les droits administrateur à un compte existant."""
+    user = find_user(email)
+    if user is None:
+        raise click.ClickException('Aucun compte ne correspond à cette adresse.')
+    access = db.session.get(AdminAccess, user.id)
+    if revoke and access:
+        db.session.delete(access)
+    elif not revoke and access is None:
+        db.session.add(AdminAccess(user_id=user.id))
+    db.session.commit()
+    click.echo('Droits administrateur retirés.' if revoke else 'Droits administrateur accordés.')
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -193,6 +253,194 @@ def find_user(email):
 
 def valid_password(password):
     return isinstance(password, str) and 8 <= len(password) <= 512
+
+
+@app.route('/admin')
+@admin_required
+def admin():
+    announcements = db.session.execute(db.select(Announcement).order_by(Announcement.id.desc()).limit(100)).scalars().all()
+    return render_template('admin.html', announcements=announcements)
+
+
+@app.route('/admin/announcements/new', methods=['GET', 'POST'])
+@app.route('/admin/announcements/<int:identifier>/edit', methods=['GET', 'POST'])
+@admin_required
+def announcement_new(identifier=None):
+    announcement = db.get_or_404(Announcement, identifier) if identifier else None
+    if announcement and announcement.locked:
+        abort(409, 'Une annonce déjà diffusée ne peut plus être modifiée. Créez un nouveau message.')
+    values = {'title': '', 'body': '', 'kind': 'message', 'scheduled_for': '', 'duration': ''}
+    if announcement:
+        values = {key: getattr(announcement, key) for key in values}
+    error = None
+    if request.method == 'POST':
+        values = {key: request.form.get(key, '').strip() for key in values}
+        if values['kind'] not in ('message', 'downtime', 'update'):
+            error = 'Choisissez un type de message valide.'
+        elif ('\r' in values['title'] or '\n' in values['title'] or
+              len(values['title']) > 160 or len(values['body']) > 5000 or len(values['duration']) > 80):
+            error = 'Limites : titre de 160 caractères, message de 5 000 caractères, durée de 80 caractères.'
+        elif request.form.get('action') == 'template':
+            if values['kind'] == 'update':
+                try:
+                    planned = datetime.strptime(values['scheduled_for'], '%Y-%m-%dT%H:%M')
+                    if not values['duration']:
+                        raise ValueError
+                    values['title'] = values['title'] or 'Mise à jour programmée de Watermap'
+                    values['body'] = (
+                        f'Une mise à jour de Watermap est prévue le {planned:%d/%m/%Y} à {planned:%H:%M} '
+                        f'(heure de Paris), pour une durée estimée de {values["duration"]}. '
+                        'Le service pourra être temporairement indisponible pendant cette intervention. '
+                        'Merci de votre compréhension.'
+                    )
+                except ValueError:
+                    error = 'Renseignez la date, l’heure et la durée estimée de la mise à jour.'
+            elif values['kind'] == 'downtime':
+                values['title'] = values['title'] or 'Indisponibilité de Watermap'
+                values['body'] = 'Watermap est temporairement indisponible. Nous vous informerons du rétablissement du service. Merci de votre compréhension.'
+            else:
+                error = 'Choisissez « Indisponibilité » ou « Mise à jour programmée » pour remplir le modèle.'
+        elif not values['title'] or not values['body']:
+            error = 'Renseignez le titre et le message.'
+        else:
+            if values['scheduled_for']:
+                try:
+                    datetime.strptime(values['scheduled_for'], '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    error = 'La date et l’heure sont invalides.'
+            if not error:
+                if announcement:
+                    updated = db.session.execute(db.update(Announcement).where(
+                        Announcement.id == identifier, Announcement.locked.is_(False)
+                    ).values(**values))
+                    if updated.rowcount != 1:
+                        db.session.rollback()
+                        abort(409)
+                else:
+                    announcement = Announcement(**values, created_by=current_user.id)
+                    db.session.add(announcement)
+                db.session.commit()
+                flash('Brouillon enregistré. Vérifiez le message avant sa diffusion.', 'success')
+                return redirect(url_for('announcement_detail', identifier=announcement.id))
+    return render_template('announcement_form.html', values=values, error=error)
+
+
+@app.route('/admin/announcements/<int:identifier>')
+@admin_required
+def announcement_detail(identifier):
+    announcement = db.get_or_404(Announcement, identifier)
+    deliveries = db.session.execute(db.select(AnnouncementDelivery).where(
+        AnnouncementDelivery.announcement_id == identifier
+    ).order_by(AnnouncementDelivery.user_id)).scalars().all()
+    return render_template('announcement_detail.html', announcement=announcement, deliveries=deliveries,
+                           recipient_count=db.session.query(User).count(),
+                           mail_suppressed=app.config['MAIL_SUPPRESS_SEND'])
+
+
+@app.route('/admin/announcements/<int:identifier>/publish', methods=['POST'])
+@admin_required
+def announcement_publish(identifier):
+    db.get_or_404(Announcement, identifier)
+    db.session.execute(db.update(Announcement).where(Announcement.id == identifier).values(published=True, locked=True))
+    db.session.commit()
+    flash('Annonce publiée dans l’application.', 'success')
+    return redirect(url_for('announcement_detail', identifier=identifier))
+
+
+@app.route('/admin/announcements/<int:identifier>/hide', methods=['POST'])
+@admin_required
+def announcement_hide(identifier):
+    announcement = db.get_or_404(Announcement, identifier)
+    announcement.published = False
+    db.session.commit()
+    flash('Annonce retirée de l’application.', 'success')
+    return redirect(url_for('announcement_detail', identifier=identifier))
+
+
+def deliver_announcement(identifier):
+    """Claim each recipient before SMTP; never retry an uncertain delivery."""
+    with app.app_context():
+        try:
+            announcement = db.session.get(Announcement, identifier)
+            if announcement.mail_simulated != app.config['MAIL_SUPPRESS_SEND']:
+                app.logger.error('Le mode de courriel de l’annonce %s a changé ; envoi suspendu.', identifier)
+                return
+            recipients = db.session.execute(db.select(AnnouncementDelivery.user_id).where(
+                AnnouncementDelivery.announcement_id == identifier,
+                AnnouncementDelivery.status == 'pending'
+            ).order_by(AnnouncementDelivery.user_id)).scalars().all()
+            for user_id in recipients:
+                claimed = db.session.execute(db.update(AnnouncementDelivery).where(
+                    AnnouncementDelivery.announcement_id == identifier,
+                    AnnouncementDelivery.user_id == user_id,
+                    AnnouncementDelivery.status == 'pending'
+                ).values(status='sending'))
+                db.session.commit()
+                if claimed.rowcount != 1:
+                    continue
+                delivery = db.session.get(AnnouncementDelivery, (identifier, user_id))
+                try:
+                    message = Message('Watermap — ' + announcement.title, recipients=[delivery.email],
+                                      sender=app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
+                                      or ('watermap@example.invalid' if announcement.mail_simulated else None))
+                    message.body = (f'Bonjour {delivery.name},\n\n{announcement.body}\n\n'
+                                    f'{app.config["PUBLIC_BASE_URL"]}\n')
+                    message.msgId = f'<watermap-announcement-{identifier}-{user_id}@watermap.dolisi.fr>'
+                    if not announcement.mail_simulated:
+                        mail.send(message)
+                except Exception:
+                    delivery.status = 'uncertain'
+                    db.session.commit()
+                    app.logger.error('Envoi d’annonce %s interrompu ; résultat SMTP à vérifier.', identifier)
+                    break
+                delivery.status = 'simulated' if app.config['MAIL_SUPPRESS_SEND'] else 'sent'
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('Traitement du courriel d’annonce %s interrompu.', identifier)
+        finally:
+            mail_slots.release()
+
+
+@app.route('/admin/announcements/<int:identifier>/send', methods=['POST'])
+@admin_required
+@limiter.limit('5 per minute')
+def announcement_send(identifier):
+    db.get_or_404(Announcement, identifier)
+    if request.form.get('confirm') != 'yes':
+        abort(400, 'Confirmez l’envoi aux utilisateurs de cette instance.')
+    if not app.config['MAIL_SUPPRESS_SEND'] and not (app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')):
+        flash('Configurez l’expéditeur SMTP avant l’envoi.', 'danger')
+        return redirect(url_for('announcement_detail', identifier=identifier))
+    if not mail_slots.acquire(blocking=False):
+        abort(503, 'La file de courriels est pleine. Réessayez plus tard.')
+    try:
+        # Lock content before snapshotting the local instance's recipients.
+        db.session.execute(db.update(Announcement).where(Announcement.id == identifier).values(locked=True))
+        announcement = db.session.get(Announcement, identifier, populate_existing=True)
+        if announcement.mail_prepared and announcement.mail_simulated != app.config['MAIL_SUPPRESS_SEND']:
+            abort(409, 'Le mode de courriel a changé. Créez une nouvelle annonce pour ce mode.')
+        if not announcement.mail_prepared:
+            for user in db.session.execute(db.select(User).order_by(User.id)).scalars():
+                db.session.add(AnnouncementDelivery(announcement_id=identifier, user_id=user.id,
+                                                    email=user.email, name=user.name or ''))
+            announcement.mail_prepared = True
+            announcement.mail_simulated = app.config['MAIL_SUPPRESS_SEND']
+        db.session.commit()
+        mail_executor.submit(deliver_announcement, identifier)
+    except Exception:
+        db.session.rollback()
+        mail_slots.release()
+        raise
+    flash('Envoi demandé. Consultez le suivi ci-dessous ; les envois déjà tentés ne sont pas répétés.', 'success')
+    return redirect(url_for('announcement_detail', identifier=identifier))
+
+
+@app.context_processor
+def inject_announcements():
+    return {'announcements': db.session.execute(
+        db.select(Announcement).where(Announcement.published.is_(True)).order_by(Announcement.id.desc())
+    ).scalars().all()}
 
 
 @app.after_request

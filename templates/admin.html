@@ -1,0 +1,18 @@
+{% extends 'admin_base.html' %}
+{% block content %}
+<span class="badge">Communication</span>
+<h1>Messages aux utilisateurs</h1>
+<p class="muted">Préparez une annonce, vérifiez son contenu puis choisissez comment la diffuser.</p>
+<a class="button" href="{{ url_for('announcement_new') }}">Rédiger un message</a>
+<section class="card">
+  <h2>Annonces récentes</h2>
+  {% if announcements %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Message</th><th>Création</th><th>Dans l’application</th></tr></thead>
+    <tbody>{% for item in announcements %}
+      <tr><td><a href="{{ url_for('announcement_detail', identifier=item.id) }}">{{ item.title }}</a></td><td>{{ item.created_at.strftime('%d/%m/%Y') }}</td><td>{{ 'Publié' if item.published else ('Retiré / courriel' if item.locked else 'Brouillon') }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="muted">Aucun message pour le moment.</p>{% endif %}
+</section>
+{% endblock %}

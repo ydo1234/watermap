@@ -1,0 +1,6 @@
+{% for announcement in announcements %}
+<aside role="status" style="background: #fff8dc; color: #433713; border: 1px solid #d6bf69; border-radius: 8px; padding: 14px 18px; margin: 12px 0 20px; text-align: left;">
+  <strong>{{ announcement.title }}</strong>
+  <div style="white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; font-size: .95rem;">{{ announcement.body }}</div>
+</aside>
+{% endfor %}

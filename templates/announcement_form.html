@@ -1,0 +1,26 @@
+{% extends 'admin_base.html' %}
+{% block title %}Préparer un message{% endblock %}
+{% block content %}
+<h1>Préparer un message</h1>
+<p class="muted">Le brouillon reste privé jusqu’à sa diffusion. Les modèles sont entièrement modifiables.</p>
+{% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+<form method="post" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="kind">Type de message</label>
+  <select id="kind" name="kind">
+    <option value="message" {{ 'selected' if values.kind == 'message' }}>Message libre</option>
+    <option value="downtime" {{ 'selected' if values.kind == 'downtime' }}>Indisponibilité du service</option>
+    <option value="update" {{ 'selected' if values.kind == 'update' }}>Mise à jour programmée</option>
+  </select>
+  <div class="row">
+    <div><label for="scheduled_for">Date et heure prévues (Paris)</label><input type="datetime-local" id="scheduled_for" name="scheduled_for" value="{{ values.scheduled_for }}"></div>
+    <div><label for="duration">Durée estimée</label><input id="duration" name="duration" maxlength="80" placeholder="Ex. : 30 minutes" value="{{ values.duration }}"></div>
+  </div>
+  <div class="actions"><button class="secondary" name="action" value="template" formnovalidate>Remplir avec le modèle</button></div>
+  <p class="muted">Le modèle remplace le texte ci-dessous. La date sert à informer les utilisateurs ; la publication se fait manuellement.</p>
+  <label for="title">Titre</label><input id="title" name="title" maxlength="160" required value="{{ values.title }}">
+  <label for="body">Message</label><textarea id="body" name="body" maxlength="5000" required>{{ values.body }}</textarea>
+  <p class="muted">Texte simple, jusqu’à 5 000 caractères. Une annonce d’indisponibilité laisse l’accès au service ouvert.</p>
+  <div class="actions"><button name="action" value="save">Enregistrer et prévisualiser</button><a href="{{ url_for('admin') }}">Annuler</a></div>
+</form>
+{% endblock %}

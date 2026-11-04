@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Administration{% endblock %} · Watermap</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #243046; background: #f2f4fa; }
+    main { max-width: 960px; margin: auto; }
+    nav { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 8px 0 24px; }
+    a { color: #4d55b5; }
+    h1 { font-size: 1.9rem; line-height: 1.2; margin: 8px 0 16px; }
+    h2 { font-size: 1.2rem; margin: 0 0 16px; }
+    .card { background: white; padding: 24px; border: 1px solid #dce1ed; border-radius: 12px; margin: 20px 0; }
+    .muted { color: #58647a; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .85rem; background: #ecedfc; color: #414590; }
+    label { display: block; font-weight: 600; margin: 16px 0 6px; }
+    input:not([type=checkbox]), select, textarea { width: 100%; padding: 10px; font: inherit; color: inherit; border: 1px solid #aeb8cc; border-radius: 6px; }
+    textarea { min-height: 210px; resize: vertical; }
+    button, .button { display: inline-block; padding: 10px 16px; background: #535cb8; color: white; border: 0; border-radius: 6px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .secondary { background: #e9ecf5; color: #35425c; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .message { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .alert { padding: 12px 16px; border-radius: 6px; background: #e5f3eb; margin: 16px 0; }
+    .alert-danger { background: #fff0ed; color: #99362c; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #e4e7ee; overflow-wrap: anywhere; }
+    .table-wrap { overflow-x: auto; }
+    :focus-visible { outline: 3px solid #838de2; outline-offset: 3px; }
+    @media (max-width: 600px) { body { padding: 16px; } .card { padding: 18px; } .row { grid-template-columns: 1fr; gap: 0; } }
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="Navigation d’administration"><a href="{{ url_for('admin') }}">Watermap · Administration</a><a href="{{ url_for('home') }}">Retour à mes itinéraires</a></nav>
+  {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{ category }}" role="status">{{ message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

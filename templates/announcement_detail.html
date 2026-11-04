@@ -1,0 +1,37 @@
+{% extends 'admin_base.html' %}
+{% block title %}{{ announcement.title }}{% endblock %}
+{% block content %}
+<span class="badge">{{ 'Annonce diffusée' if announcement.locked else 'Brouillon privé' }}</span>
+<h1>{{ announcement.title }}</h1>
+<section class="card" aria-label="Prévisualisation du message">
+  <h2>Prévisualisation</h2>
+  <div class="message">{{ announcement.body }}</div>
+  {% if not announcement.locked %}<div class="actions"><a href="{{ url_for('announcement_new', identifier=announcement.id) }}">Modifier le brouillon</a></div>{% endif %}
+</section>
+<section class="card">
+  <h2>Afficher dans l’application</h2>
+  <p>Le message sera visible sur les écrans d’accueil et de connexion, y compris avant identification.</p>
+  <form method="post" action="{{ url_for('announcement_hide' if announcement.published else 'announcement_publish', identifier=announcement.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button>{{ 'Retirer de l’application' if announcement.published else 'Publier dans l’application' }}</button>
+  </form>
+</section>
+<section class="card">
+  <h2>Envoyer par courriel</h2>
+  {% if mail_suppressed %}<div class="alert">Simulation active : aucun courriel réel ne sera envoyé.</div>{% endif %}
+  <p>Un courriel individuel sera adressé à chacun des {{ deliveries|length if announcement.mail_prepared else recipient_count }} utilisateurs {{ 'retenus au premier envoi' if announcement.mail_prepared else 'actuellement inscrits sur cette instance' }}. Le lien vers Watermap sera ajouté au message.</p>
+  <form method="post" action="{{ url_for('announcement_send', identifier=announcement.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label><input type="checkbox" name="confirm" value="yes" required> Je confirme le contenu et l’envoi aux utilisateurs de cette instance.</label>
+    <div class="actions"><button>{{ 'Simuler' if mail_suppressed else 'Envoyer' }}{{ ' les envois restants' if announcement.mail_prepared else ' le message' }}</button></div>
+  </form>
+  {% if announcement.mail_prepared %}
+  <h2 style="margin-top: 28px">Suivi des envois</h2>
+  <p class="muted">Actualisez cette page pour consulter la progression. Seuls les courriels en attente peuvent être repris. Un envoi interrompu ou incertain doit être vérifié avant toute autre action.</p>
+  {% set labels = {'pending': 'En attente', 'sending': 'En cours / à vérifier si interrompu', 'sent': 'Envoyé', 'uncertain': 'À vérifier — résultat incertain', 'simulated': 'Simulé — aucun envoi réel'} %}
+  <div class="table-wrap"><table><thead><tr><th>Destinataire</th><th>État</th></tr></thead><tbody>
+  {% for delivery in deliveries %}<tr><td>{{ delivery.email }}</td><td>{{ labels[delivery.status] }}</td></tr>{% else %}<tr><td colspan="2">Aucun destinataire au moment de l’envoi.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% endif %}
+</section>
+{% endblock %}
