@@ -108,6 +108,9 @@ def test_processing_isolation_escaping_and_distance(module, client, owner, monke
     result = wait_for(client, uploaded.json['task_id'])
     assert result['error'] is None, result
     page = client.get('/generated/map')
+    assert page.headers['Referrer-Policy'] == 'strict-origin-when-cross-origin'
+    assert b"referrerPolicy: 'strict-origin-when-cross-origin'" in page.data
+    assert b'https://tile.openstreetmap.org/{z}/{x}/{y}.png' in page.data
     assert malicious.encode() not in page.data
     assert b'\\u003c/script\\u003e' in page.data
     assert b'L.polyline' in page.data and b'L.GPX' not in page.data
@@ -280,3 +283,23 @@ def test_browser_login_from_rendered_form(module, client, entry_path):
     assert response.status_code == 200
     assert response.request.path == '/'
     assert 'Mes pages' in response.get_data(as_text=True)
+
+
+def test_map_uses_origin_referrer_without_exposing_private_path(module, client, owner):
+    folder = Path(module.get_user_page_folder(owner.id))
+    (folder/'legacy-map.html').write_text("""<!doctype html><html><body><script>
+    const map = L.map('map').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    </script></body></html>""")
+    response = client.get('/generated/legacy-map')
+    assert response.headers['Referrer-Policy'] == 'strict-origin-when-cross-origin'
+    assert b'https://tile.openstreetmap.org/{z}/{x}/{y}.png' in response.data
+    assert b'https://{s}.tile.openstreetmap.org' not in response.data
+    assert b'https://www.openstreetmap.org/copyright' in response.data
+    image_policy = response.headers['Content-Security-Policy'].split('img-src', 1)[1].split(';', 1)[0].split()
+    assert 'https://tile.openstreetmap.org' in image_policy
+    assert client.get('/').headers['Referrer-Policy'] == 'no-referrer'
+    reset_path = '/reset-password/' + owner.get_reset_token()
+    assert client.get(reset_path).headers['Referrer-Policy'] == 'no-referrer'

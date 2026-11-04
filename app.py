@@ -199,13 +199,18 @@ def valid_password(password):
 def security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-    response.headers['Referrer-Policy'] = 'no-referrer'
+    # OSM tiles require a Referer. Share only the origin from map pages; keep
+    # recovery tokens and all other pages from sending any referrer.
+    response.headers['Referrer-Policy'] = (
+        'strict-origin-when-cross-origin'
+        if request.endpoint == 'page' and response.status_code == 200 else 'no-referrer'
+    )
     response.headers['Cache-Control'] = 'private, no-store'
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; "
         f"form-action 'self'; script-src 'self' 'nonce-{csp_nonce()}' https://unpkg.com https://cdnjs.cloudflare.com; "
         "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "img-src 'self' data: https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com https://unpkg.com; "
+        "img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com https://unpkg.com; "
         "connect-src 'self'"
     )
     return response
@@ -750,8 +755,9 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, user_id, gp
   <script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\" integrity=\"sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=\" crossorigin=\"anonymous\"></script>
   <script nonce=\"__WATERMAP_CSP_NONCE__\">
     const map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-      attribution: '&copy; OpenStreetMap contributors'
+    L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+      referrerPolicy: 'strict-origin-when-cross-origin',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }}).addTo(map);
 
     const waterPoints = {water_points_js};
@@ -955,6 +961,9 @@ def page(page_name):
     content = content.replace('nonce="__WATERMAP_CSP_NONCE__"', f'nonce="{csp_nonce()}"')
     # Preserve historical maps while refusing arbitrary inline script elements.
     content = content.replace("<script>\n    const map = L.map('map')", f"<script nonce=\"{csp_nonce()}\">\n    const map = L.map('map')")
+    # Existing maps also need the current OSM endpoint and attribution.
+    content = content.replace('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
+    content = content.replace("attribution: '&copy; OpenStreetMap contributors'", "attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors'")
     return app.response_class(content, mimetype='text/html')
 
 
