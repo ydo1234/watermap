@@ -4,7 +4,7 @@ Watermap est servi sur https://watermap.dolisi.fr depuis `/opt/watermap` sur le 
 
 ## Préparer une version
 
-La branche `dev` reste sur le Raspberry Pi pour la recette. Après validation par Yann, fusionner `dev` dans `main`. Seule une version de `main` est déployée sur le VPS.
+Le développement se fait sur `dev`. La recette de Yann se fait sur `stag`, créée depuis `dev`, sur le Raspberry Pi. Après validation par Yann, fusionner la version validée de `stag` dans `main`. Seule une version de `main` est déployée sur le VPS ; ne jamais déployer `dev` ou `stag` ni inclure des changements de `dev` non validés sur `stag`.
 
 Depuis la racine du dépôt sur `main`, préparer un **nouveau** répertoire extérieur au dépôt :
 

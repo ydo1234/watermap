@@ -4,7 +4,7 @@ Application Flask pour trouver des points d'eau et des toilettes à proximité d
 
 ## Branches et recette
 
-Le développement et la recette se font sur **`dev`, sur le Raspberry Pi**. Après validation de Yann, fusionner dans **`main`**, puis déployer `main` sur le VPS. Ne jamais déployer `dev` sur le VPS. La production est servie sur https://watermap.dolisi.fr ; sa procédure est dans [deploy/ionos/README.md](deploy/ionos/README.md).
+Le développement et les corrections se font sur **`dev`**. La branche **`stag`**, issue de `dev`, sert à la recette de Yann sur le Raspberry Pi. Les corrections sont intégrées depuis `dev` dans `stag` pour être retestées. Après validation de Yann, fusionner la version validée de `stag` dans **`main`**, puis déployer `main` sur le VPS. Ne jamais déployer `dev` ou `stag` sur le VPS, ni ajouter à `main` des changements de `dev` non validés en recette. La production est servie sur https://watermap.dolisi.fr ; sa procédure est dans [deploy/ionos/README.md](deploy/ionos/README.md).
 
 Le Compose à la racine ne gère que la recette. Les anciens conteneurs et volumes de production du RPi sont conservés séparément : ne pas utiliser `--remove-orphans` ou `down -v` pour nettoyer cette installation.
 
@@ -14,7 +14,7 @@ Renseigner `.env` à partir de `.env.example`, avec une clé aléatoire d'au moi
 
 ```bash
 cd /home/yann/watermap
-git switch dev
+git switch stag
 docker compose config --quiet
 docker compose up -d --build --wait --wait-timeout 90 watermap_dev
 docker compose ps watermap_dev
