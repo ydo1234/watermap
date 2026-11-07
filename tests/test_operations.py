@@ -17,7 +17,7 @@ def test_release_includes_new_modules(tmp_path):
     result = subprocess.run([sys.executable,str(ROOT/'deploy/ionos/prepare-release.py'),str(destination)],capture_output=True,text=True,check=True)
     manifest = json.loads(result.stdout)
     assert manifest['contains_secrets_or_user_data'] is False
-    for name in ('app.py','remote_fetch.py','gpx_utils.py','gpx_export.py','mail_safety.py','spatial.py'):
+    for name in ('app.py','remote_fetch.py','gpx_utils.py','gpx_export.py','mail_safety.py','tcx_export.py','spatial.py'):
         assert (destination/'source'/name).read_bytes() == (ROOT/name).read_bytes()
         assert '!'+name+'\n' in (destination/'source'/'.dockerignore').read_text()
     assert not (destination/'source'/'.env').exists()

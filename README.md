@@ -89,3 +89,19 @@ téléphone. L’import et l’envoi au Edge sont ensuite finalisés dans Connec
 Un téléchargement et des instructions restent disponibles si le partage est
 indisponible ou annulé, notamment sur la recette HTTP. Aucune connexion de
 compte Garmin ni publication via l’API Courses n’est effectuée.
+
+## Import Garmin Connect (TCX)
+
+Le bouton « Garmin (TCX) » et le partage mobile utilisent un TCX Course avec
+des CoursePoints explicites. L’eau utilise le type Garmin Water ; les toilettes
+utilisent Generic avec un nom WC, car le schéma TCX ne définit pas de type
+toilettes. Les vraies coordonnées des POI sont conservées ; les points sont
+ordonnés et associés au point de tracé le plus proche par leur horodatage.
+Les noms courts respectent la limite du schéma et les noms complets restent
+dans les notes. La chronologie TCX est indicative, à 18 km/h, sans donnée
+d’activité réelle. Le GPX original et son export enrichi restent disponibles.
+
+Cet export est prévu pour contourner l’échec de sauvegarde Connect observé
+avec le GPX contenant des waypoints indépendants. La conformité XML est
+testée ; l’enregistrement effectif dans Connect reste à valider sur le compte
+de Yann.

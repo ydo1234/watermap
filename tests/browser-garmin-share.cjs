@@ -40,18 +40,18 @@ async function main(){
   await evaluate("document.getElementById('garmin-share-file').click()");
   await waitFor('Boolean(window.__shared)');
   const shared=await evaluate('window.__shared');
-  if(!shared.name.endsWith('-watermap.gpx')||shared.type!=='application/gpx+xml'||!shared.text.includes('<wpt')||shared.keys.join(',')!=='files')throw new Error('Wrong GPX attachment');
+  if(!shared.name.endsWith('-watermap.tcx')||shared.type!=='application/vnd.garmin.tcx+xml'||!shared.text.includes('CoursePoint')||shared.keys.join(',')!=='files')throw new Error('Wrong TCX attachment');
   await evaluate("window.__shareMode='cancel';document.getElementById('garmin-share-file').click()");
   await waitFor("document.getElementById('garmin-share-status').textContent.includes('annulé')");
   await evaluate("document.getElementById('garmin-share-close').click();window.__shareMode='unsupported';document.querySelector('[data-garmin-share]').click()");
   await waitFor("document.getElementById('garmin-share-status').textContent.includes('ne permet pas')");
   const fallback=await evaluate("({hidden:document.getElementById('garmin-share-file').hidden,href:document.getElementById('garmin-share-download').getAttribute('href'),width:document.documentElement.scrollWidth,screen:innerWidth})");
-  if(!fallback.hidden||!fallback.href.endsWith('/enriched.gpx')||fallback.width>fallback.screen+2)throw new Error('Fallback or mobile layout invalid');
+  if(!fallback.hidden||!fallback.href.endsWith('/garmin.tcx')||fallback.width>fallback.screen+2)throw new Error('Fallback or mobile layout invalid');
   await evaluate("document.getElementById('garmin-share-close').click();Object.defineProperty(navigator,'share',{configurable:true,value:undefined});document.querySelector('[data-garmin-share]').click()");
   await waitFor("document.getElementById('garmin-share-status').textContent.includes('ne propose pas')");
   const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
   fs.writeFileSync('/home/yann/watermap-deployment/garmin-share-'+label+'.png',Buffer.from(shot.data,'base64'));
-  console.log(JSON.stringify({page:label,sharedGpx:true,cancel:true,unsupportedFallback:true,mobile:true,nativeSharing:'mocked; no external application contacted'}));
+  console.log(JSON.stringify({page:label,sharedTcx:true,cancel:true,unsupportedFallback:true,mobile:true,nativeSharing:'mocked; no external application contacted'}));
  }
  await call('Page.removeScriptToEvaluateOnNewDocument',{identifier:inject.identifier});
  if(input.base.startsWith('http://127.0.0.1')){

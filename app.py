@@ -36,6 +36,7 @@ from remote_fetch import fetch_public_url
 from gpx_utils import coordinate, parse_track, MAX_FILE_BYTES, MAX_TRACK_POINTS
 from spatial import RouteIndex, PointSet, vector, EARTH_RADIUS
 from gpx_export import enriched_gpx, map_points, MAX_MAP_BYTES
+from tcx_export import enriched_tcx
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.environ.get('WATERMAP_DATA_DIR', BASE_DIR)
@@ -1219,20 +1220,21 @@ def page(page_name):
     content = content.replace("attribution: '&copy; OpenStreetMap contributors'", "attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors'")
     # Add the export action to existing maps without rewriting their saved files.
     if 'data-watermap-enriched' not in content:
-        export_url = html.escape(url_for('download_enriched', page_name=page_name), quote=True)
+        export_url = html.escape(url_for('download_enriched', page_name=page_name, export_format='gpx'), quote=True)
         content = content.replace('</nav>', f' · <a data-watermap-enriched href="{export_url}" download style="display:inline-block; padding:8px 12px; margin:4px 0; background:#edf2ff; border:1px solid #c7d2fe; border-radius:6px;">GPX enrichi · eau et WC</a></nav>', 1)
-    share_url = html.escape(url_for('download_enriched', page_name=page_name), quote=True)
-    share_name = html.escape(secure_filename(page_name) + '-watermap.gpx', quote=True)
+    share_url = html.escape(url_for('download_enriched', page_name=page_name, export_format='tcx'), quote=True)
+    share_name = html.escape(secure_filename(page_name) + '-watermap.tcx', quote=True)
     share_button = f' · <button type="button" data-garmin-share data-gpx-url="{share_url}" data-gpx-name="{share_name}" style="padding:8px 12px;margin:4px 0;border:1px solid #5464ce;border-radius:6px;background:#5464ce;color:white;cursor:pointer;">Envoyer à Garmin Connect</button>'
-    content = content.replace('</nav>', share_button + '</nav>', 1)
+    content = content.replace('</nav>', f' · <a href="{share_url}" download style="display:inline-block;padding:8px 12px;background:#edf2ff;border:1px solid #c7d2fe;border-radius:6px;">Garmin (TCX)</a>' + share_button + '</nav>', 1)
     content = content.replace('</body>', render_template('gpx_share.html') + '</body>', 1)
     return app.response_class(content, mimetype='text/html')
 
 
-@app.route('/itineraries/<page_name>/enriched.gpx')
+@app.route('/itineraries/<page_name>/garmin.tcx', defaults={'export_format': 'tcx'})
+@app.route('/itineraries/<page_name>/enriched.gpx', defaults={'export_format': 'gpx'})
 @login_required
 @limiter.limit('10 per minute')
-def download_enriched(page_name):
+def download_enriched(page_name, export_format):
     safe_name = secure_filename(page_name)
     if not safe_name or safe_name != page_name:
         abort(404)
@@ -1251,11 +1253,11 @@ def download_enriched(page_name):
         if len(saved_map) > MAX_MAP_BYTES:
             raise ValueError('Cette carte est trop volumineuse pour être exportée.')
         water, toilets = map_points(saved_map.decode('utf-8'))
-        result = enriched_gpx(original, water, toilets)
+        result = enriched_tcx(original, water, toilets, safe_name) if export_format == 'tcx' else enriched_gpx(original, water, toilets)
     except (ValueError, UnicodeError) as error:
         return app.response_class(str(error), status=422, mimetype='text/plain')
-    return send_file(BytesIO(result), mimetype='application/gpx+xml', as_attachment=True,
-                     download_name=safe_name + '-watermap.gpx', max_age=0)
+    return send_file(BytesIO(result), mimetype='application/vnd.garmin.tcx+xml' if export_format == 'tcx' else 'application/gpx+xml', as_attachment=True,
+                     download_name=safe_name + '-watermap.' + export_format, max_age=0)
 
 
 @app.route('/uploads/<int:user_id>/<path:filename>')
