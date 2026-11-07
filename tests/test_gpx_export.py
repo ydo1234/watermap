@@ -13,7 +13,7 @@ ORIGINAL = b'''<?xml version="1.0"?><gpx xmlns="http://www.topografix.com/GPX/1/
 
 
 def page_data(water=WATER, toilets=TOILETS):
-    return '<nav><a href="/">Retour</a></nav><script>\n    const waterPoints = ' + json.dumps(water) + ';\n    const toiletPoints = ' + json.dumps(toilets) + ';\n</script>'
+    return '<!doctype html><html><body><nav><a href="/">Retour</a></nav><script>\n    const waterPoints = ' + json.dumps(water) + ';\n    const toiletPoints = ' + json.dumps(toilets) + ';\n</script></body></html>'
 
 
 def saved_route(module, user, name='tour', original=ORIGINAL, content=None):
@@ -84,6 +84,11 @@ def test_download_and_buttons_leave_saved_files_untouched(module, client, owner)
     detail = client.get('/generated/tour')
     assert detail.status_code == 200
     assert b'/itineraries/tour/enriched.gpx' in detail.data
+    for html in (client.get('/').text, detail.text):
+        assert 'data-garmin-share' in html
+        assert 'data-gpx-name="tour-watermap.gpx"' in html
+        assert 'id="garmin-share-dialog"' in html
+        assert 'script nonce="' in html
     assert (upload.read_bytes(), page.read_bytes()) == before
 
 

@@ -1,0 +1,90 @@
+<dialog id="garmin-share-dialog" aria-labelledby="garmin-share-title" style="width:min(460px,calc(100% - 32px));margin:auto;padding:24px;border:0;border-radius:12px;color:#333;box-shadow:0 10px 40px #0004;">
+  <h2 id="garmin-share-title" style="font-size:1.3rem;margin-bottom:12px;">Envoyer à Garmin Connect</h2>
+  <p id="garmin-share-status" role="status" aria-live="polite" style="line-height:1.5;margin-bottom:12px;"></p>
+  <p style="line-height:1.5;margin-bottom:18px;">Choisis Garmin Connect dans les applications proposées, enregistre le parcours, puis utilise « Envoyer vers l’appareil » dans Connect. Si Connect n’apparaît pas, télécharge le fichier et ouvre-le depuis les fichiers de ton téléphone.</p>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+    <button type="button" id="garmin-share-file" hidden style="padding:10px 14px;border:0;border-radius:6px;background:#5464ce;color:white;cursor:pointer;">Partager le GPX</button>
+    <a id="garmin-share-download" download style="padding:10px 14px;border:1px solid #c7d2fe;border-radius:6px;color:#4355b9;text-decoration:none;">Télécharger le GPX</a>
+    <button type="button" id="garmin-share-close" style="padding:10px 14px;border:1px solid #ccc;border-radius:6px;background:white;cursor:pointer;">Fermer</button>
+  </div>
+</dialog>
+<script nonce="{{ csp_nonce() }}">
+(() => {
+  const dialog = document.getElementById('garmin-share-dialog');
+  const status = document.getElementById('garmin-share-status');
+  const shareButton = document.getElementById('garmin-share-file');
+  const download = document.getElementById('garmin-share-download');
+  let file = null;
+  let pending = null;
+  let generation = 0;
+  document.getElementById('garmin-share-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => {
+    generation += 1;
+    if (pending) pending.abort();
+    pending = null;
+    file = null;
+    shareButton.hidden = true;
+  });
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-garmin-share]');
+    if (!button) return;
+    const url = new URL(button.dataset.gpxUrl, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    if (pending) pending.abort();
+    const current = ++generation;
+    file = null;
+    shareButton.hidden = true;
+    shareButton.disabled = false;
+    download.href = url.href;
+    status.textContent = 'Préparation du GPX enrichi…';
+    if (!dialog.open) dialog.showModal();
+    if (!window.isSecureContext) {
+      status.textContent = 'Le partage direct nécessite une page HTTPS. Sur cette page, télécharge le GPX enrichi puis ouvre-le avec Garmin Connect.';
+      return;
+    }
+    if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
+      status.textContent = 'Ce navigateur ne propose pas le partage de fichiers. Télécharge le GPX enrichi puis ouvre-le avec Garmin Connect.';
+      return;
+    }
+    pending = new AbortController();
+    try {
+      const response = await fetch(url.href, {credentials: 'same-origin', signal: pending.signal});
+      if (current !== generation) return;
+      if (!response.ok) throw new Error('Le GPX enrichi n’a pas pu être préparé. Vérifie le téléchargement ou réessaie.');
+      if (!(response.headers.get('Content-Type') || '').includes('application/gpx+xml')) {
+        throw new Error('Reconnecte-toi à Watermap, puis réessaie.');
+      }
+      const blob = await response.blob();
+      if (current !== generation) return;
+      file = new File([blob], button.dataset.gpxName, {type: 'application/gpx+xml'});
+      if (!navigator.canShare({files: [file]})) {
+        file = null;
+        status.textContent = 'Ce téléphone ne permet pas de partager directement ce fichier GPX. Télécharge-le puis ouvre-le avec Garmin Connect.';
+        return;
+      }
+      shareButton.hidden = false;
+      status.textContent = 'Le GPX enrichi est prêt. Appuie sur « Partager le GPX », puis choisis Garmin Connect s’il est proposé.';
+    } catch (error) {
+      if (current === generation && error.name !== 'AbortError') status.textContent = error.message;
+    } finally {
+      if (current === generation) pending = null;
+    }
+  });
+  // A second explicit tap keeps the native share inside a fresh user gesture.
+  shareButton.addEventListener('click', async () => {
+    if (!file || shareButton.disabled) return;
+    const current = generation;
+    shareButton.disabled = true;
+    try {
+      await navigator.share({files: [file]});
+      if (current === generation) status.textContent = 'Le partage a été ouvert. Termine l’import dans Garmin Connect, puis envoie le parcours à ton appareil.';
+    } catch (error) {
+      if (current === generation) {
+        status.textContent = error.name === 'AbortError' ? 'Partage annulé. Tu peux réessayer ou télécharger le GPX.' : 'Le partage n’a pas abouti. Tu peux réessayer ou télécharger le GPX.';
+      }
+    } finally {
+      shareButton.disabled = false;
+    }
+  });
+})();
+</script>

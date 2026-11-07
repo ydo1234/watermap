@@ -80,3 +80,12 @@ restent à valider sur l’appareil : cet export ne crée pas de course FIT ni
 d’alertes Garmin. Les anciennes cartes contenant les listes JSON sont prises
 en charge sans régénération ; sinon le téléchargement demande de recréer la
 page. Les données cartographiques sont celles de la création de la carte.
+
+Le bouton « Envoyer à Garmin Connect » prépare le même GPX enrichi pour le
+partage natif du téléphone. Le partage est proposé uniquement si le navigateur
+accepte ce fichier et si la page est sécurisée (HTTPS). Un second appui ouvre
+le sélecteur d’applications ; Garmin Connect doit y être proposé par le
+téléphone. L’import et l’envoi au Edge sont ensuite finalisés dans Connect.
+Un téléchargement et des instructions restent disponibles si le partage est
+indisponible ou annulé, notamment sur la recette HTTP. Aucune connexion de
+compte Garmin ni publication via l’API Courses n’est effectuée.

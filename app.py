@@ -1218,6 +1218,11 @@ def page(page_name):
     if 'data-watermap-enriched' not in content:
         export_url = html.escape(url_for('download_enriched', page_name=page_name), quote=True)
         content = content.replace('</nav>', f' · <a data-watermap-enriched href="{export_url}" download style="display:inline-block; padding:8px 12px; margin:4px 0; background:#edf2ff; border:1px solid #c7d2fe; border-radius:6px;">GPX enrichi · eau et WC</a></nav>', 1)
+    share_url = html.escape(url_for('download_enriched', page_name=page_name), quote=True)
+    share_name = html.escape(secure_filename(page_name) + '-watermap.gpx', quote=True)
+    share_button = f' · <button type="button" data-garmin-share data-gpx-url="{share_url}" data-gpx-name="{share_name}" style="padding:8px 12px;margin:4px 0;border:1px solid #5464ce;border-radius:6px;background:#5464ce;color:white;cursor:pointer;">Envoyer à Garmin Connect</button>'
+    content = content.replace('</nav>', share_button + '</nav>', 1)
+    content = content.replace('</body>', render_template('gpx_share.html') + '</body>', 1)
     return app.response_class(content, mimetype='text/html')
 
 
