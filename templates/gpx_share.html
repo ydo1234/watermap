@@ -19,6 +19,8 @@
   let generation = 0;
   document.getElementById('garmin-share-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
+    // A close event can arrive after the dialog has already been reopened.
+    if (dialog.open) return;
     generation += 1;
     if (pending) pending.abort();
     pending = null;
