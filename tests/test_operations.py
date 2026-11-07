@@ -19,6 +19,7 @@ def test_release_includes_new_modules(tmp_path):
     assert manifest['contains_secrets_or_user_data'] is False
     for name in ('app.py','remote_fetch.py','gpx_utils.py','gpx_export.py','mail_safety.py','spatial.py'):
         assert (destination/'source'/name).read_bytes() == (ROOT/name).read_bytes()
+        assert '!'+name+'\n' in (destination/'source'/'.dockerignore').read_text()
     assert not (destination/'source'/'.env').exists()
     assert not (destination/'source'/'db').exists()
 
