@@ -17,7 +17,7 @@ def test_release_includes_new_modules(tmp_path):
     result = subprocess.run([sys.executable,str(ROOT/'deploy/ionos/prepare-release.py'),str(destination)],capture_output=True,text=True,check=True)
     manifest = json.loads(result.stdout)
     assert manifest['contains_secrets_or_user_data'] is False
-    for name in ('app.py','remote_fetch.py','gpx_utils.py','gpx_export.py','spatial.py'):
+    for name in ('app.py','remote_fetch.py','gpx_utils.py','gpx_export.py','mail_safety.py','spatial.py'):
         assert (destination/'source'/name).read_bytes() == (ROOT/name).read_bytes()
     assert not (destination/'source'/'.env').exists()
     assert not (destination/'source'/'db').exists()
@@ -95,12 +95,13 @@ def test_staging_entrypoint_is_isolated(tmp_path):
     environment = dict(os.environ, SECRET_KEY=secrets.token_urlsafe(48),
                        WATERMAP_DATA_DIR=str(tmp_path),
                        WATERMAP_PUBLIC_URL='https://stag.watermap.dolisi.fr',
-                       MAIL_SUPPRESS_SEND='true')
+                       MAIL_SUPPRESS_SEND='false', WATERMAP_INSTANCE='stag', MAIL_REDIRECT_TO='ydolisi@gmail.com')
     script = """import runpy
 app=runpy.run_path('deploy/stag/wsgi.py')['app']
 assert app.config['SESSION_COOKIE_SECURE'] is True
 assert app.config['SESSION_COOKIE_NAME']=='watermap_stag_session'
-assert app.config['MAIL_SUPPRESS_SEND'] is True
+assert app.config['MAIL_SUPPRESS_SEND'] is False
+assert app.config['MAIL_REDIRECT_TO']=='ydolisi@gmail.com'
 client=app.test_client()
 assert client.get('/login',base_url='https://stag.watermap.dolisi.fr').status_code==200
 assert client.get('/login',base_url='https://watermap.dolisi.fr').status_code==400
@@ -108,7 +109,7 @@ assert client.get('/_health',base_url='http://127.0.0.1').status_code==200
 """
     result=subprocess.run([sys.executable,'-c',script],cwd=ROOT,env=environment,capture_output=True,text=True)
     assert result.returncode==0,result.stderr
-    environment['MAIL_SUPPRESS_SEND']='false'
+    environment['MAIL_REDIRECT_TO']='other@example.invalid'
     result=subprocess.run([sys.executable,'-c',script],cwd=ROOT,env=environment,capture_output=True,text=True)
     assert result.returncode!=0
-    assert 'must suppress outgoing mail' in result.stderr
+    assert 'must redirect exclusively' in result.stderr

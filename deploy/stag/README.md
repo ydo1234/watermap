@@ -5,8 +5,11 @@ déployée dans /opt/watermap-stag, distinct de /opt/watermap (production main).
 Domaine : https://stag.watermap.dolisi.fr, DNS A vers 82.165.183.204.
 
 Utiliser une clé SECRET_KEY propre à la recette, FLASK_ENV=development,
-WATERMAP_PUBLIC_URL=https://stag.watermap.dolisi.fr et MAIL_SUPPRESS_SEND=true.
-Ne pas copier les identifiants SMTP de production. Les données de recette
+WATERMAP_PUBLIC_URL=https://stag.watermap.dolisi.fr, WATERMAP_INSTANCE=stag,
+MAIL_REDIRECT_TO=ydolisi@gmail.com et MAIL_SUPPRESS_SEND=false. Tous les
+destinataires À/Cc/Cci sont remplacés par cette adresse, avec objet [STAG].
+Les seuls paramètres SMTP nécessaires peuvent être repris du serveur existant,
+sans copier la clé de session ni les données de production. Les données de recette
 proviennent exclusivement du Raspberry ; ne jamais remplacer celles de production.
 
 Construire depuis un export propre de stag avec le Dockerfile IONOS et ce

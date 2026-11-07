@@ -27,7 +27,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from itsdangerous import URLSafeTimedSerializer as Serializer, BadSignature
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from flask_mail import Mail, Message
+from flask_mail import Message
+from mail_safety import SafeMail
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -76,12 +77,14 @@ app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
 app.config['MAIL_TIMEOUT'] = 15
 app.config['MAIL_SUPPRESS_SEND'] = os.environ.get('MAIL_SUPPRESS_SEND', '').lower() == 'true'
+app.config['WATERMAP_INSTANCE'] = os.environ.get('WATERMAP_INSTANCE', '')
+app.config['MAIL_REDIRECT_TO'] = os.environ.get('MAIL_REDIRECT_TO', '')
 
 csrf = CSRFProtect(app)
 limiter = Limiter(get_remote_address, app=app, storage_uri='memory://')
 
 db = SQLAlchemy(app)
-mail = Mail(app)
+mail = SafeMail(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."

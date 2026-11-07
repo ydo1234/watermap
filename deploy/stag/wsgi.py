@@ -5,8 +5,8 @@ from app import app
 
 if os.environ.get('WATERMAP_PUBLIC_URL') != 'https://stag.watermap.dolisi.fr':
     raise RuntimeError('The staging instance requires its dedicated public URL')
-if os.environ.get('MAIL_SUPPRESS_SEND') != 'true':
-    raise RuntimeError('Staging must suppress outgoing mail')
+if os.environ.get('WATERMAP_INSTANCE') != 'stag' or os.environ.get('MAIL_REDIRECT_TO') != 'ydolisi@gmail.com':
+    raise RuntimeError('Staging must redirect all mail to the approved owner mailbox')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.config.update(
     SESSION_COOKIE_SECURE=True, REMEMBER_COOKIE_SECURE=True,
@@ -15,7 +15,7 @@ app.config.update(
     SESSION_COOKIE_NAME='watermap_stag_session',
     REMEMBER_COOKIE_NAME='watermap_stag_remember',
     TRUSTED_HOSTS=['stag.watermap.dolisi.fr', 'localhost', '127.0.0.1'],
-    PUBLIC_BASE_URL='https://stag.watermap.dolisi.fr', MAIL_SUPPRESS_SEND=True,
+    PUBLIC_BASE_URL='https://stag.watermap.dolisi.fr',
 )
 
 @app.get('/_health')
