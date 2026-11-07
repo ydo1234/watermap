@@ -34,7 +34,7 @@ async function main(){
  for(const [label,url] of [['list',input.base+'/'],['detail',input.base+'/generated/'+encodeURIComponent(input.page)]]){
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await call('Page.navigate',{url});
-  await waitFor("Boolean(document.querySelector('[data-garmin-share]'))");
+  await waitFor("location.href === " + JSON.stringify(url) + " && document.readyState === 'complete' && Boolean(document.getElementById('garmin-share-dialog'))");
   await evaluate("document.querySelector('[data-garmin-share]').click()");
   await waitFor("!document.getElementById('garmin-share-file').hidden");
   await evaluate("document.getElementById('garmin-share-file').click()");
@@ -54,6 +54,7 @@ async function main(){
   console.log(JSON.stringify({page:label,sharedGpx:true,cancel:true,unsupportedFallback:true,mobile:true,nativeSharing:'mocked; no external application contacted'}));
  }
  await call('Page.removeScriptToEvaluateOnNewDocument',{identifier:inject.identifier});
+ if(input.base.startsWith('http://127.0.0.1')){
  const insecure=input.base.replace('127.0.0.1','192.168.2.11');
  await call('Network.setCookie',{name:input.cookieName,value:input.cookie,url:insecure,path:'/'});
  await call('Page.navigate',{url:insecure+'/'});
@@ -61,5 +62,9 @@ async function main(){
  await evaluate("document.querySelector('[data-garmin-share]').click()");
  await waitFor("document.getElementById('garmin-share-status').textContent.includes('HTTPS')");
  console.log(JSON.stringify({insecureHttpFallback:true}));
+ }else{
+  if(!(await evaluate('window.isSecureContext')))throw new Error('HTTPS required');
+  console.log(JSON.stringify({realHttpsContext:true}));
+ }
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;}).finally(async()=>{if(socket)socket.close();chrome.kill('SIGTERM');await delay(300);fs.rmSync(profile,{recursive:true,force:true});});
