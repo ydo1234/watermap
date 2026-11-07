@@ -3,8 +3,8 @@
   <p id="garmin-share-status" role="status" aria-live="polite" style="line-height:1.5;margin-bottom:12px;"></p>
   <p style="line-height:1.5;margin-bottom:18px;">Choisis Garmin Connect dans les applications proposées, enregistre le parcours, puis utilise « Envoyer vers l’appareil » dans Connect. Si Connect n’apparaît pas, télécharge le fichier et ouvre-le depuis les fichiers de ton téléphone.</p>
   <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-    <button type="button" id="garmin-share-file" hidden style="padding:10px 14px;border:0;border-radius:6px;background:#5464ce;color:white;cursor:pointer;">Partager le parcours</button>
-    <a id="garmin-share-download" download style="padding:10px 14px;border:1px solid #c7d2fe;border-radius:6px;color:#4355b9;text-decoration:none;">Télécharger le TCX</a>
+    <button type="button" id="garmin-share-file" hidden style="padding:10px 14px;border:0;border-radius:6px;background:#5464ce;color:white;cursor:pointer;">Partager le GPX</button>
+    <a id="garmin-share-download" download style="padding:10px 14px;border:1px solid #c7d2fe;border-radius:6px;color:#4355b9;text-decoration:none;">Télécharger le GPX</a>
     <button type="button" id="garmin-share-close" style="padding:10px 14px;border:1px solid #ccc;border-radius:6px;background:white;cursor:pointer;">Fermer</button>
   </div>
 </dialog>
@@ -38,35 +38,34 @@
     shareButton.hidden = true;
     shareButton.disabled = false;
     download.href = url.href;
-    status.textContent = 'Préparation du parcours enrichi…';
+    status.textContent = 'Préparation du GPX enrichi…';
     if (!dialog.open) dialog.showModal();
     if (!window.isSecureContext) {
-      status.textContent = 'Le partage direct nécessite une page HTTPS. Sur cette page, télécharge le parcours enrichi puis ouvre-le avec Garmin Connect.';
+      status.textContent = 'Le partage direct nécessite une page HTTPS. Sur cette page, télécharge le GPX enrichi puis ouvre-le avec Garmin Connect.';
       return;
     }
     if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
-      status.textContent = 'Ce navigateur ne propose pas le partage de fichiers. Télécharge le parcours enrichi puis ouvre-le avec Garmin Connect.';
+      status.textContent = 'Ce navigateur ne propose pas le partage de fichiers. Télécharge le GPX enrichi puis ouvre-le avec Garmin Connect.';
       return;
     }
     pending = new AbortController();
     try {
       const response = await fetch(url.href, {credentials: 'same-origin', signal: pending.signal});
       if (current !== generation) return;
-      if (!response.ok) throw new Error('Le parcours enrichi n’a pas pu être préparé. Vérifie le téléchargement ou réessaie.');
-      const contentType = response.headers.get('Content-Type') || '';
-      if (!contentType.includes('application/vnd.garmin.tcx+xml')) {
+      if (!response.ok) throw new Error('Le GPX enrichi n’a pas pu être préparé. Vérifie le téléchargement ou réessaie.');
+      if (!(response.headers.get('Content-Type') || '').includes('application/gpx+xml')) {
         throw new Error('Reconnecte-toi à Watermap, puis réessaie.');
       }
       const blob = await response.blob();
       if (current !== generation) return;
-      file = new File([blob], button.dataset.gpxName, {type: 'application/vnd.garmin.tcx+xml'});
+      file = new File([blob], button.dataset.gpxName, {type: 'application/gpx+xml'});
       if (!navigator.canShare({files: [file]})) {
         file = null;
-        status.textContent = 'Ce téléphone ne permet pas de partager directement ce fichier TCX. Télécharge-le puis ouvre-le avec Garmin Connect.';
+        status.textContent = 'Ce téléphone ne permet pas de partager directement ce fichier GPX. Télécharge-le puis ouvre-le avec Garmin Connect.';
         return;
       }
       shareButton.hidden = false;
-      status.textContent = 'Le parcours enrichi est prêt. Appuie sur « Partager le parcours », puis choisis Garmin Connect s’il est proposé.';
+      status.textContent = 'Le GPX enrichi est prêt. Appuie sur « Partager le GPX », puis choisis Garmin Connect s’il est proposé.';
     } catch (error) {
       if (current === generation && error.name !== 'AbortError') status.textContent = error.message;
     } finally {
@@ -83,7 +82,7 @@
       if (current === generation) status.textContent = 'Le partage a été ouvert. Termine l’import dans Garmin Connect, puis envoie le parcours à ton appareil.';
     } catch (error) {
       if (current === generation) {
-        status.textContent = error.name === 'AbortError' ? 'Partage annulé. Tu peux réessayer ou télécharger le parcours.' : 'Le partage n’a pas abouti. Tu peux réessayer ou télécharger le parcours.';
+        status.textContent = error.name === 'AbortError' ? 'Partage annulé. Tu peux réessayer ou télécharger le GPX.' : 'Le partage n’a pas abouti. Tu peux réessayer ou télécharger le GPX.';
       }
     } finally {
       shareButton.disabled = false;
