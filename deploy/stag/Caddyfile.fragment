@@ -1,0 +1,14 @@
+
+stag.watermap.dolisi.fr {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        X-Robots-Tag "noindex, nofollow"
+        -Server
+    }
+    @health path /_health
+    respond @health 404
+    reverse_proxy watermap-stag-app:8000
+}

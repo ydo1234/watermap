@@ -68,3 +68,11 @@ Après succès des contrôles réels, `notify-release.py` envoie individuellemen
 Le mode sans `--send` indique seulement le nombre de destinataires de production. Pour un envoi autorisé, monter le manifeste et les notes dans le conteneur applicatif réel et appeler le script avec `--manifest`, `--notes` et `--send`. Conserver le registre lors des déploiements et dans les sauvegardes.
 
 Le contrôle de connexion doit aussi être réalisé dans un navigateur sur le site HTTPS, pour vérifier les référents, les cookies et CSRF dans les conditions réelles. Le contrôle optionnel `node tests/browser-login-https.cjs https://watermap.dolisi.fr`, depuis le RPi équipé de Chromium et du module Node `undici`, utilise un identifiant fictif aléatoire et vérifie que le POST de connexion atteint normalement le traitement des identifiants. Les tests ne doivent pas forcer un référent que la politique du document empêcherait le navigateur d'envoyer.
+
+## Recette HTTPS distincte
+
+Depuis le 7 novembre 2026, stag.watermap.dolisi.fr utilise une installation
+séparée dans /opt/watermap-stag. Sa configuration est documentée dans
+deploy/stag/README.md. Le proxy Caddy de production dessert les deux domaines ;
+conserver le bloc stag lors des mises à jour de production. Les données, clés
+de session et identifiants de service restent propres à chaque instance.

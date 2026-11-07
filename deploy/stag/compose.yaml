@@ -1,0 +1,37 @@
+name: watermap-stag
+services:
+  stag_app:
+    build: ./source
+    image: watermap-ionos:stag
+    restart: unless-stopped
+    env_file:
+      - path: ./runtime.env
+        format: raw
+    ports:
+      - "127.0.0.1:8082:8000"
+    volumes:
+      - ./data/db:/app/db
+      - ./data/pages:/app/pages
+      - ./data/uploads:/app/uploads
+    networks:
+      proxy:
+        aliases: [watermap-stag-app]
+    read_only: true
+    tmpfs: [/tmp:size=128m,mode=1777]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_health', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+networks:
+  proxy:
+    external: true
+    name: watermap_default

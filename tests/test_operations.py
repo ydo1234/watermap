@@ -89,3 +89,26 @@ def test_restore_verification_with_uncheckpointed_wal(tmp_path,monkeypatch,tampe
             module.main()
     else:
         module.main()
+
+
+def test_staging_entrypoint_is_isolated(tmp_path):
+    environment = dict(os.environ, SECRET_KEY=secrets.token_urlsafe(48),
+                       WATERMAP_DATA_DIR=str(tmp_path),
+                       WATERMAP_PUBLIC_URL='https://stag.watermap.dolisi.fr',
+                       MAIL_SUPPRESS_SEND='true')
+    script = """import runpy
+app=runpy.run_path('deploy/stag/wsgi.py')['app']
+assert app.config['SESSION_COOKIE_SECURE'] is True
+assert app.config['SESSION_COOKIE_NAME']=='watermap_stag_session'
+assert app.config['MAIL_SUPPRESS_SEND'] is True
+client=app.test_client()
+assert client.get('/login',base_url='https://stag.watermap.dolisi.fr').status_code==200
+assert client.get('/login',base_url='https://watermap.dolisi.fr').status_code==400
+assert client.get('/_health',base_url='http://127.0.0.1').status_code==200
+"""
+    result=subprocess.run([sys.executable,'-c',script],cwd=ROOT,env=environment,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    environment['MAIL_SUPPRESS_SEND']='false'
+    result=subprocess.run([sys.executable,'-c',script],cwd=ROOT,env=environment,capture_output=True,text=True)
+    assert result.returncode!=0
+    assert 'must suppress outgoing mail' in result.stderr
