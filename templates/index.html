@@ -240,6 +240,7 @@
               <tr>
                 <td><a href="{{ url_for('page', page_name=page.name) }}">{{ page.name }}</a></td>
                 <td style="text-align: right;">
+                  <a href="{{ url_for('download_enriched', page_name=page.name) }}" download title="Télécharger le parcours avec ses points d’eau et toilettes" style="display:inline-block; margin: 4px 12px 4px 0; padding: 8px 12px; background: #edf2ff; border: 1px solid #c7d2fe; border-radius: 6px;">⬇ GPX enrichi · eau et WC</a>
                   <form class="delete-form" data-page-name="{{ page.name }}" action="{{ url_for('delete', page_name=page.name) }}" method="post" style="display:inline;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn-delete">🗑️ Supprimer</button>

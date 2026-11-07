@@ -19,7 +19,7 @@ def main():
     destination.mkdir(parents=True, exist_ok=False, mode=0o700)
     source = destination / 'source'
     source.mkdir()
-    for name in ('app.py', 'remote_fetch.py', 'gpx_utils.py', 'spatial.py', 'water.gpx', 'toilets_all.osm.gpx'):
+    for name in ('app.py', 'remote_fetch.py', 'gpx_utils.py', 'gpx_export.py', 'spatial.py', 'water.gpx', 'toilets_all.osm.gpx'):
         shutil.copy2(repository / name, source / name)
     shutil.copytree(repository / 'templates', source / 'templates')
     shutil.copy2(repository / 'requirements.lock', source / 'requirements.txt')

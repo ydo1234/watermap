@@ -1,4 +1,5 @@
 import hashlib
+from io import BytesIO
 import hmac
 import urllib.parse
 import html
@@ -18,7 +19,7 @@ from functools import wraps
 import click
 from concurrent.futures import ThreadPoolExecutor
 from defusedxml import ElementTree as SafeET
-from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify, session, flash, g, abort
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify, session, flash, g, abort, send_file
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -33,6 +34,7 @@ from flask_limiter.util import get_remote_address
 from remote_fetch import fetch_public_url
 from gpx_utils import coordinate, parse_track, MAX_FILE_BYTES, MAX_TRACK_POINTS
 from spatial import RouteIndex, PointSet, vector, EARTH_RADIUS
+from gpx_export import enriched_gpx, map_points, MAX_MAP_BYTES
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.environ.get('WATERMAP_DATA_DIR', BASE_DIR)
@@ -1212,7 +1214,40 @@ def page(page_name):
     # Existing maps also need the current OSM endpoint and attribution.
     content = content.replace('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
     content = content.replace("attribution: '&copy; OpenStreetMap contributors'", "attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors'")
+    # Add the export action to existing maps without rewriting their saved files.
+    if 'data-watermap-enriched' not in content:
+        export_url = html.escape(url_for('download_enriched', page_name=page_name), quote=True)
+        content = content.replace('</nav>', f' · <a data-watermap-enriched href="{export_url}" download style="display:inline-block; padding:8px 12px; margin:4px 0; background:#edf2ff; border:1px solid #c7d2fe; border-radius:6px;">GPX enrichi · eau et WC</a></nav>', 1)
     return app.response_class(content, mimetype='text/html')
+
+
+@app.route('/itineraries/<page_name>/enriched.gpx')
+@login_required
+@limiter.limit('10 per minute')
+def download_enriched(page_name):
+    safe_name = secure_filename(page_name)
+    if not safe_name or safe_name != page_name:
+        abort(404)
+    # Both inputs belong to the authenticated account; no other user's ID is accepted.
+    with file_lock:
+        if (current_user.id, safe_name) in active_names:
+            return app.response_class('Cet itinéraire est en cours de création.', status=409, mimetype='text/plain')
+        try:
+            with open(os.path.join(get_user_page_folder(current_user.id), safe_name + '.html'), 'rb') as source:
+                saved_map = source.read(MAX_MAP_BYTES + 1)
+            with open(os.path.join(get_user_upload_folder(current_user.id), safe_name + '.gpx'), 'rb') as source:
+                original = source.read(MAX_FILE_BYTES + 1)
+        except FileNotFoundError:
+            abort(404)
+    try:
+        if len(saved_map) > MAX_MAP_BYTES:
+            raise ValueError('Cette carte est trop volumineuse pour être exportée.')
+        water, toilets = map_points(saved_map.decode('utf-8'))
+        result = enriched_gpx(original, water, toilets)
+    except (ValueError, UnicodeError) as error:
+        return app.response_class(str(error), status=422, mimetype='text/plain')
+    return send_file(BytesIO(result), mimetype='application/gpx+xml', as_attachment=True,
+                     download_name=safe_name + '-watermap.gpx', max_age=0)
 
 
 @app.route('/uploads/<int:user_id>/<path:filename>')

@@ -66,3 +66,17 @@ pas SMTP. L’annonce d’indisponibilité ne bloque pas le service.
 
 L’attribution des droits, le fonctionnement des deux canaux et la reprise des
 envois sont décrits dans [docs/administration.md](docs/administration.md).
+
+## GPX enrichi (recette)
+
+Le bouton « GPX enrichi · eau et WC », présent sur la liste et le détail des
+itinéraires, télécharge une copie du GPX avec les points déjà sélectionnés sur
+la carte (même distance de recherche). Le tracé, ses segments, altitudes, dates,
+extensions et points personnels sont conservés. Le GPX original reste inchangé.
+
+Les ajouts sont des waypoints GPX avec un nom préfixé EAU ou WC, un type et un
+symbole distincts. Leur affichage et leurs icônes sur le Edge après import
+restent à valider sur l’appareil : cet export ne crée pas de course FIT ni
+d’alertes Garmin. Les anciennes cartes contenant les listes JSON sont prises
+en charge sans régénération ; sinon le téléchargement demande de recréer la
+page. Les données cartographiques sont celles de la création de la carte.
