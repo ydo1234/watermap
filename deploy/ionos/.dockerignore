@@ -5,6 +5,7 @@
 !remote_fetch.py
 !gpx_utils.py
 !spatial.py
+!watermap_oidc.py
 !wsgi.py
 !templates/
 !templates/**

@@ -1,0 +1,5 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Retrouver mon compte Watermap</title></head>
+<body><main><h1>Retrouver mes données Watermap</h1><p>Un compte Watermap existe pour {{ email }}. Saisissez son mot de passe actuel pour le rattacher à votre compte commun et conserver vos cartes et vos droits.</p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Mot de passe Watermap <input name="password" type="password" autocomplete="current-password" required maxlength="512"></label><button type="submit">Rattacher mon compte</button></form>
+<p>Cette confirmation n’est nécessaire qu’une fois. Si vous ne connaissez plus votre ancien mot de passe, contactez l’administrateur avant de rattacher vos données.</p></main></body></html>

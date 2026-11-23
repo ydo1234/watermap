@@ -204,9 +204,13 @@ def load_user(user_id):
     try:
         identifier, version = user_id.split(':', 1)
         user = db.session.get(User, int(identifier))
-        return user if user and hmac.compare_digest(version, user.password_version()) else None
+        return user if (user and hmac.compare_digest(version, user.password_version())
+                        and (not app.config.get('OIDC_ENABLED') or oidc['valid_session'](user.id))) else None
     except (TypeError, ValueError, AttributeError):
         return None
+
+from watermap_oidc import install_oidc
+oidc = install_oidc(app, db, User, csrf, limiter)
 
 with app.app_context():
     db.create_all()
@@ -1085,6 +1089,8 @@ def process_gpx_task(task_id, upload_path, page_name, original_name, user_id, gp
 @app.route('/logout', methods=['POST'])
 @login_required
 def logout():
+    if app.config.get('OIDC_ENABLED'):
+        return oidc['logout']()
     logout_user()
     session.clear()
     return redirect(url_for('home'))
