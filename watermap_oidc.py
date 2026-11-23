@@ -1,5 +1,6 @@
 """Connexion OIDC facultative ; les identifiants et fichiers Watermap restent stables."""
 import os
+import re
 import hashlib
 import secrets
 import threading
@@ -85,19 +86,23 @@ def install_oidc(app, db, User, csrf, limiter):
             provider_sid=identity.get('sid'), id_token=identity['id_token'], expires=time.time() + 43200)
         db.session.add(record)
         db.session.commit()
+        return_to = session.get('sso_return_to', url_for('home'))
         session.clear()
         login_user(user)
         session['oidc_session'] = record.id
         session.permanent = True
-        return redirect(url_for('home'))
+        return redirect(return_to)
 
     @bp.get('/auth/login')
     @limiter.limit('20 per minute')
     def login():
         enabled()
+        transfer = request.args.get('transfer', '')
+        return_to = '/imports/cyclerouter/' + transfer if re.fullmatch(r'[a-f0-9]{64}', transfer) else url_for('home')
         if current_user.is_authenticated:
-            return redirect(url_for('home'))
+            return redirect(return_to)
         session.clear()
+        session['sso_return_to'] = return_to
         try:
             return client.authorize_redirect(app.config['PUBLIC_BASE_URL'] + '/auth/callback', nonce=secrets.token_urlsafe(32))
         except Exception:
@@ -127,8 +132,10 @@ def install_oidc(app, db, User, csrf, limiter):
                     pending[key] = (time.time() + 600, identity, user.id)
                     while len(pending) > 128:
                         pending.popitem(last=False)
+                return_to = session.get('sso_return_to', url_for('home'))
                 session.clear()
                 session['pending_sso'] = key
+                session['sso_return_to'] = return_to
                 return redirect(url_for('sso.link_account'))
             user = User(name=(info.get('name') or info['email'])[:100], email=info['email'].strip().lower())
             user.set_password(secrets.token_urlsafe(64))

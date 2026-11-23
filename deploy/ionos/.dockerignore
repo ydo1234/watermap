@@ -6,6 +6,7 @@
 !gpx_utils.py
 !spatial.py
 !watermap_oidc.py
+!cyclerouter_import.py
 !wsgi.py
 !templates/
 !templates/**

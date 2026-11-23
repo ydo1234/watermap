@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Importer depuis CycleRouter · WaterMap</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 40px 18px; color: #25314b; background: linear-gradient(135deg,#667eea,#764ba2); font: 16px/1.6 system-ui,sans-serif; }
+    main { width: min(100%,620px); margin: auto; padding: clamp(22px,5vw,40px); background: white; border-radius: 16px; box-shadow: 0 12px 40px #26355e33; }
+    .eyebrow { color: #5464ce; font-weight: 700; font-size: .85rem; margin: 0; }
+    h1 { line-height: 1.2; font-size: clamp(1.5rem,5vw,2rem); margin: 12px 0 20px; }
+    label { display: block; font-weight: 600; margin: 20px 0 6px; }
+    input { width: 100%; padding: 12px; border: 1px solid #aeb8d0; border-radius: 8px; font: inherit; }
+    button { margin-top: 24px; width: 100%; padding: 14px; border: 0; border-radius: 8px; color: white; background: #5464ce; font: 600 1rem system-ui; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    a { color: #495abe; }
+    .hint { color: #5e687d; font-size: .9rem; }
+    progress { width: 100%; margin-top: 20px; accent-color: #5464ce; }
+    #import-status { white-space: pre-line; }
+    :focus-visible { outline: 3px solid #e7ac42; outline-offset: 3px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">CycleRouter → WaterMap</p>
+  <h1>Votre trace est prête à être importée</h1>
+  <p>Retrouvez les points d’eau et les toilettes le long de votre parcours. La carte sera enregistrée dans votre compte Watermap.</p>
+  <form id="import-form" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="page_name">Nom de l’itinéraire</label>
+    <input id="page_name" name="page_name" value="{{ name }}" maxlength="100" required>
+    <label for="max_distance">Distance de recherche depuis la trace (m)</label>
+    <input id="max_distance" name="max_distance" type="number" min="0" max="5000" value="500" step="1" required>
+    <p class="hint">Le tracé complet est conservé. Si ce nom existe déjà, un numéro sera ajouté.</p>
+    <button id="import-button" type="submit">Importer et ouvrir la carte</button>
+  </form>
+  <progress id="import-progress" max="100" value="0" hidden></progress>
+  <p id="import-status" role="status" aria-live="polite"></p>
+  <p class="hint">Confirmez l’import dans les 15 minutes suivant l’envoi depuis CycleRouter.</p>
+  <a href="{{ url_for('home') }}">Mes itinéraires Watermap</a>
+</main>
+<script nonce="{{ csp_nonce() }}">
+  const form = document.getElementById('import-form');
+  const button = document.getElementById('import-button');
+  const progress = document.getElementById('import-progress');
+  const status = document.getElementById('import-status');
+  function failed(error) {
+    status.textContent = error.message || 'Le traitement a échoué. Réessayez.';
+    button.disabled = false;
+    button.textContent = 'Réessayer l’import';
+  }
+  async function follow(taskId) {
+    try {
+      const response = await fetch('/status/' + encodeURIComponent(taskId));
+      if (!response.ok || response.redirected) throw new Error('Le suivi est indisponible. Reconnectez-vous ou réessayez l’import.');
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+      progress.hidden = false;
+      progress.value = result.progress;
+      status.textContent = result.message;
+      if (result.done) {
+        if (!result.page_url) throw new Error('La carte n’a pas pu être créée. Réessayez.');
+        window.location.assign(result.page_url);
+      } else setTimeout(() => follow(taskId), 1200);
+    } catch (error) { failed(error); }
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (button.disabled) return;
+    button.disabled = true;
+    status.textContent = 'Import de votre trace…';
+    try {
+      const response = await fetch(window.location.pathname, {method: 'POST', body: new FormData(form)});
+      if (response.redirected) throw new Error('Votre session a expiré. Rechargez cette page pour vous reconnecter.');
+      let result;
+      try { result = await response.json(); }
+      catch (_) { throw new Error('L’import est indisponible ou a expiré. Rechargez la page ou renvoyez la trace depuis CycleRouter.'); }
+      if (!response.ok) throw new Error(result.error || 'L’import n’a pas pu démarrer. Réessayez.');
+      if (result.page_url) window.location.assign(result.page_url);
+      else if (result.task_id) follow(result.task_id);
+      else throw new Error('Le suivi de l’import est indisponible. Réessayez.');
+    } catch (error) { failed(error); }
+  });
+  const activeTask = {{ task_id | tojson }};
+  if (activeTask) { button.disabled = true; follow(activeTask); }
+</script>
+</body>
+</html>

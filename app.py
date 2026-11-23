@@ -212,12 +212,6 @@ def load_user(user_id):
 from watermap_oidc import install_oidc
 oidc = install_oidc(app, db, User, csrf, limiter)
 
-with app.app_context():
-    db.create_all()
-    # SQLite expression indexes are not reflected by SQLAlchemy's `checkfirst`.
-    with db.engine.begin() as connection:
-        connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_user_email_lower ON user (lower(email))')
-
 def get_user_upload_folder(user_id):
     path = os.path.join(UPLOAD_FOLDER, str(user_id))
     os.makedirs(path, exist_ok=True)
@@ -1115,6 +1109,11 @@ def home():
 def upload():
     gpx_url = request.form.get('gpx_url', '').strip()
     file = request.files.get('gpx_file')
+    return start_upload(file, gpx_url, request.form.get('page_name', ''), request.form.get('max_distance', '500'))
+
+
+def start_upload(file, gpx_url, page_name_input, max_distance_input):
+    """Même traitement et mêmes quotas pour les uploads et les transferts CycleRouter."""
 
     if not file and not gpx_url:
         return jsonify({'error': 'Aucun fichier ou URL envoyé'}), 400
@@ -1122,7 +1121,7 @@ def upload():
     if file and file.filename == '':
         return jsonify({'error': 'Fichier non valide'}), 400
 
-    page_name_input = request.form.get('page_name', '').strip()
+    page_name_input = page_name_input.strip()
     if not page_name_input:
         return jsonify({'error': 'Le nom de la page est requis'}), 400
 
@@ -1137,7 +1136,7 @@ def upload():
     if file and not allowed_file(file.filename):
         return jsonify(error='Seuls les fichiers .gpx sont acceptés.'), 400
     try:
-        max_distance = int(request.form.get('max_distance', '500'))
+        max_distance = int(max_distance_input)
         if not 0 <= max_distance <= 5000:
             raise ValueError
     except ValueError:
@@ -1193,7 +1192,7 @@ def upload():
         processing_slots.release()
         raise
 
-    return jsonify({'task_id': task_id}), 202
+    return jsonify({'task_id': task_id, 'page_name': page_name}), 202
 
 
 @app.route('/status/<task_id>')
@@ -1292,6 +1291,16 @@ def delete(page_name):
                 os.remove(path)
 
     return redirect(url_for('home'))
+
+
+from cyclerouter_import import install_cyclerouter
+CycleTransfer = install_cyclerouter(app, db, csrf, limiter, oidc, start_upload, get_status, get_user_page_folder)
+
+with app.app_context():
+    db.create_all()
+    # SQLite expression indexes are not reflected by SQLAlchemy's `checkfirst`.
+    with db.engine.begin() as connection:
+        connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_user_email_lower ON user (lower(email))')
 
 
 if __name__ == '__main__':
