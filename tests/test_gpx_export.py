@@ -85,10 +85,9 @@ def test_download_and_buttons_leave_saved_files_untouched(module, client, owner)
     assert detail.status_code == 200
     assert b'/itineraries/tour/enriched.gpx' in detail.data
     for html in (client.get('/').text, detail.text):
-        assert 'data-garmin-share' in html
-        assert 'data-gpx-name="tour-watermap.gpx"' in html
-        assert 'id="garmin-share-dialog"' in html
-        assert 'script nonce="' in html
+        assert 'data-garmin-share' not in html
+        assert 'id="garmin-share-dialog"' not in html
+    assert 'script nonce="' in client.get('/').text
     assert (upload.read_bytes(), page.read_bytes()) == before
 
 
