@@ -228,6 +228,13 @@
     <div class="card">
       <h2>📋 Mes pages</h2>
       {% if pages %}
+        <form id="delete-all-form" action="{{ url_for('delete_all') }}" method="post" style="margin-bottom:20px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="page_count" value="{{ pages|length }}">
+          <input type="hidden" name="confirm_delete_all" value="">
+          <button type="submit" class="btn-delete" disabled>🗑️ Supprimer tous mes parcours</button>
+          <noscript><p>Activez JavaScript pour confirmer la suppression de tous vos parcours.</p></noscript>
+        </form>
         <table>
           <thead>
             <tr>
@@ -257,6 +264,19 @@
   </div>
 
   <script nonce="{{ csp_nonce() }}">
+    const deleteAllForm = document.getElementById('delete-all-form');
+    if (deleteAllForm) {
+      deleteAllForm.addEventListener('submit', event => {
+        const count = deleteAllForm.elements.page_count.value;
+        if (!confirm('Supprimer définitivement vos ' + count + ' parcours et leurs fichiers GPX ? Cette action est irréversible.')) {
+          deleteAllForm.elements.confirm_delete_all.value = '';
+          event.preventDefault();
+          return;
+        }
+        deleteAllForm.elements.confirm_delete_all.value = 'yes';
+      });
+      deleteAllForm.querySelector('button[type="submit"]').disabled = false;
+    }
     document.querySelectorAll('.delete-form').forEach(deleteForm => {
       deleteForm.addEventListener('submit', event => {
         if (!confirm('Supprimer ' + deleteForm.dataset.pageName + ' ?')) event.preventDefault();

@@ -1268,6 +1268,32 @@ def uploaded_file(user_id, filename):
     return send_from_directory(user_upload_folder, safe_filename, mimetype='application/gpx+xml', as_attachment=True)
 
 
+@app.route('/delete-all', methods=['POST'])
+@login_required
+def delete_all():
+    if request.form.get('confirm_delete_all') != 'yes':
+        abort(400)
+    user_id = current_user.id
+    user_page_folder = get_user_page_folder(user_id)
+    user_upload_folder = get_user_upload_folder(user_id)
+    with file_lock:
+        if any(owner == user_id for owner, _ in active_names):
+            flash('Un parcours est en cours de création. Attendez la fin du traitement avant de tout supprimer.', 'error')
+            return redirect(url_for('home'))
+        pages = [entry.name for entry in os.scandir(user_page_folder)
+                 if entry.name.endswith('.html') and entry.is_file(follow_symlinks=False)]
+        if request.form.get('page_count') != str(len(pages)):
+            flash('La liste des parcours a changé. Vérifiez-la puis confirmez à nouveau la suppression.', 'error')
+            return redirect(url_for('home'))
+        for filename in pages:
+            os.remove(os.path.join(user_page_folder, filename))
+            upload_path = os.path.join(user_upload_folder, filename[:-5] + '.gpx')
+            if os.path.isfile(upload_path):
+                os.remove(upload_path)
+    flash(f'{len(pages)} parcours supprimé(s).', 'success')
+    return redirect(url_for('home'))
+
+
 @app.route('/delete/<page_name>', methods=['POST'])
 @login_required
 def delete(page_name):
