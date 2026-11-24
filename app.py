@@ -94,7 +94,11 @@ mail_slots = threading.BoundedSemaphore(10)
 
 @app.context_processor
 def inject_env():
-    return {'is_dev': os.environ.get('FLASK_ENV') == 'development', 'csp_nonce': csp_nonce}
+    return {
+        'is_dev': os.environ.get('FLASK_ENV') == 'development',
+        'csp_nonce': csp_nonce,
+        'cyclerouter_url': 'https://stag.cyclerouter.dolisi.fr/' if os.environ.get('WATERMAP_INSTANCE') == 'stag' else 'https://cyclerouter.dolisi.fr/',
+    }
 
 
 def csp_nonce():

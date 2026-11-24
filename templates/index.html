@@ -20,6 +20,8 @@
     .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; background: var(--primary); color: white; border-radius: 13px; flex: 0 0 auto; }
     .brand h1 { font-size: 1.35rem; letter-spacing: -.04em; font-weight: 750; }
     .subtitle { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+    .cyclerouter-link { display: inline-flex; align-items: center; min-height: 44px; font-size: .85rem; font-weight: 600; text-decoration: none; }
+    .cyclerouter-link:hover { text-decoration: underline; }
     .account-menu { position: relative; flex: 0 0 auto; }
     .account-menu summary { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); background: white; border-radius: 12px; list-style: none; font-size: .9rem; }
     summary::-webkit-details-marker { display: none; }
@@ -107,6 +109,7 @@
           <h1>WaterMap</h1>
         </div>
         <p class="subtitle">Vos parcours, avec les points d’eau et toilettes.</p>
+        <a class="cyclerouter-link" href="{{ cyclerouter_url }}" referrerpolicy="no-referrer">← Retour à CycleRouter</a>
         {% if is_dev %}<span class="environment">Recette · développement</span>{% endif %}
       </div>
       <details class="account-menu">

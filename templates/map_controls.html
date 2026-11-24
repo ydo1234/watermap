@@ -4,6 +4,15 @@
   const expand = document.getElementById('map-expand');
   if (!mapElement || !expand) return;
   expand.hidden = false;
+  const returnLink = document.getElementById('map-cyclerouter');
+  const corner = mapElement.querySelector('.leaflet-bottom.leaflet-left');
+  if (returnLink && corner) {
+    corner.append(returnLink);
+    returnLink.hidden = false;
+    returnLink.addEventListener('click', event => event.stopPropagation());
+    returnLink.addEventListener('pointerdown', event => event.stopPropagation());
+    returnLink.addEventListener('dblclick', event => event.stopPropagation());
+  }
   if ('ResizeObserver' in window) {
     const observer = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
     observer.observe(mapElement);

@@ -15,6 +15,7 @@
     button { margin-top: 24px; width: 100%; padding: 14px; border: 0; border-radius: 8px; color: white; background: #5464ce; font: 600 1rem system-ui; cursor: pointer; }
     button:disabled { opacity: .6; cursor: wait; }
     a { color: #495abe; }
+    .cyclerouter-link { display: inline-flex; align-items: center; min-height: 44px; font-size: .9rem; text-decoration: none; }
     .hint { color: #5e687d; font-size: .9rem; }
     progress { width: 100%; margin-top: 20px; accent-color: #5464ce; }
     #import-status { white-space: pre-line; }
@@ -40,6 +41,7 @@
   <p id="import-status" role="status" aria-live="polite"></p>
   <p class="hint">Confirmez l’import dans les 15 minutes suivant l’envoi depuis CycleRouter.</p>
   <a href="{{ url_for('home') }}">Mes itinéraires Watermap</a>
+  <br><a class="cyclerouter-link" href="{{ cyclerouter_url }}" referrerpolicy="no-referrer">← Retour à CycleRouter</a>
 </main>
 <script nonce="{{ csp_nonce() }}">
   const form = document.getElementById('import-form');
