@@ -1,0 +1,40 @@
+<script nonce="{{ csp_nonce() }}">
+(() => {
+  const mapElement = document.getElementById('map');
+  const expand = document.getElementById('map-expand');
+  if (!mapElement || !expand) return;
+  expand.hidden = false;
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
+    observer.observe(mapElement);
+  }
+  const setExpanded = (expanded) => {
+    document.body.classList.toggle('map-expanded', expanded);
+    expand.setAttribute('aria-pressed', String(expanded));
+    expand.setAttribute('aria-label', expanded ? 'Quitter le plein écran' : 'Afficher la carte en plein écran');
+    expand.title = expanded ? 'Quitter le plein écran' : 'Plein écran';
+    document.querySelector('.map-downloads').open = false;
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  };
+  expand.addEventListener('click', () => setExpanded(!document.body.classList.contains('map-expanded')));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && document.body.classList.contains('map-expanded')) {
+      setExpanded(false);
+      expand.focus();
+    }
+  });
+  const compact = window.matchMedia('(max-width: 900px), (max-height: 500px)').matches;
+  document.querySelectorAll('.container > .card').forEach(card => {
+    const heading = card.querySelector('h2');
+    const section = card.querySelector('section');
+    if (!heading || !section) return;
+    const details = document.createElement('details');
+    details.className = 'points-panel';
+    details.open = !compact;
+    const summary = document.createElement('summary');
+    summary.append(heading);
+    details.append(summary, section);
+    card.append(details);
+  });
+})();
+</script>

@@ -84,6 +84,9 @@ def test_download_and_buttons_leave_saved_files_untouched(module, client, owner)
     detail = client.get('/generated/tour')
     assert detail.status_code == 200
     assert b'/itineraries/tour/enriched.gpx' in detail.data
+    assert 'class="map-toolbar"' in detail.text
+    assert 'id="map-expand"' in detail.text
+    assert 'aria-pressed="false"' in detail.text
     for html in (client.get('/').text, detail.text):
         assert 'data-garmin-share' not in html
         assert 'id="garmin-share-dialog"' not in html

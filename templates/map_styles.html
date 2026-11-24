@@ -1,0 +1,44 @@
+<style>
+  body[data-watermap-map] { margin: 0; padding: 20px; background: #f4f6fa; color: #202b40; }
+  [data-watermap-map] :focus-visible { outline: 3px solid #8995ee; outline-offset: 3px; }
+  [data-watermap-map] .container > h1, [data-watermap-map] .header-info { display: none; }
+  [data-watermap-map] .map-toolbar { display: flex; align-items: center; gap: 10px; max-width: 1200px; min-height: 60px; margin: 0 auto 16px; padding: 8px 10px; background: white; border: 1px solid #e1e5ef; border-radius: 12px; box-shadow: none; }
+  .map-back, .map-tool { display: flex; align-items: center; justify-content: center; gap: 6px; flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 8px; color: #4655b4; background: #eef1ff; border: 0; border-radius: 9px; font: 600 .8rem/1.4 system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+  .map-tool[hidden] { display: none; }
+  .map-tool .collapse-icon, .map-tool[aria-pressed=true] .expand-icon { display: none; }
+  .map-tool[aria-pressed=true] .collapse-icon { display: block; }
+  .map-route-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; font-weight: 650; }
+  .map-downloads { position: relative; flex: 0 0 auto; }
+  .map-downloads summary { list-style: none; }
+  .map-downloads summary::-webkit-details-marker { display: none; }
+  .map-download-menu { position: absolute; z-index: 1100; right: 0; top: calc(100% + 8px); width: 240px; padding: 8px; background: white; border: 1px solid #e1e5ef; border-radius: 12px; box-shadow: 0 8px 28px #24304620; }
+  .map-download-menu a { display: flex; align-items: center; min-height: 48px; padding: 12px; font: 500 .9rem/1.4 system-ui, sans-serif; border-radius: 8px; }
+  .map-download-menu a:hover { background: #eef1ff; }
+  [data-watermap-map] .card:has(> #map) { padding: 0; border-radius: 12px; overflow: hidden; box-shadow: none; }
+  [data-watermap-map] #map { position: relative; height: min(72vh, 820px); min-height: 400px; margin: 0; border-radius: 12px; }
+  [data-watermap-map] .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+  [data-watermap-map] .card:has(> .points-panel) { padding: 0; margin-bottom: 16px; box-shadow: none; border: 1px solid #e1e5ef; }
+  .points-panel > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px; cursor: pointer; list-style: none; }
+  .points-panel > summary::-webkit-details-marker { display: none; }
+  .points-panel > summary h2 { margin: 0; color: #202b40; font-size: 1rem; line-height: 1.5; }
+  .points-panel > summary::after { content: '+'; color: #5261ce; font: 24px/1 system-ui, sans-serif; }
+  .points-panel[open] > summary::after { content: '−'; }
+  .points-panel > section { padding: 0 18px 18px; }
+  [data-watermap-map] section li { overflow-wrap: anywhere; }
+  body.map-expanded { overflow: hidden; }
+  body.map-expanded #map { position: fixed !important; inset: 0; z-index: 1000; width: 100%; height: 100vh; height: 100dvh; min-height: 0; border-radius: 0; }
+  [data-watermap-map].map-expanded .map-toolbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1001; max-width: none; margin: 0; padding-top: max(8px, env(safe-area-inset-top)); border: 0; border-radius: 0; background: #ffffffed; }
+  .map-expanded .leaflet-top { top: calc(64px + env(safe-area-inset-top)); }
+  @media (max-width: 900px), (max-height: 500px) {
+    body[data-watermap-map] { padding: 0; }
+    [data-watermap-map] .container { max-width: none; padding: 0; }
+    [data-watermap-map] .map-toolbar { position: relative; z-index: 1001; height: calc(60px + env(safe-area-inset-top)); min-height: 60px; margin: 0; padding: max(8px, env(safe-area-inset-top)) 8px 8px; gap: 8px; border: 0; border-radius: 0; border-bottom: 1px solid #e1e5ef; }
+    .map-route-name { font-size: .9rem; }
+    [data-watermap-map] .card:has(> #map) { margin: 0; border-radius: 0; }
+    [data-watermap-map] #map { height: calc(100vh - 60px - env(safe-area-inset-top)); height: calc(100dvh - 60px - env(safe-area-inset-top)); min-height: 240px; border-radius: 0; }
+    [data-watermap-map] .card:has(> .points-panel) { margin: 12px; border-radius: 12px; }
+    .points-panel > summary { min-height: 56px; padding: 16px; }
+    .points-panel > summary h2 { font-size: .9rem; }
+    [data-watermap-map].map-expanded #map { height: 100vh; height: 100dvh; min-height: 0; }
+  }
+</style>

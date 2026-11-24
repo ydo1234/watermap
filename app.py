@@ -1222,10 +1222,12 @@ def page(page_name):
     # Existing maps also need the current OSM endpoint and attribution.
     content = content.replace('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
     content = content.replace("attribution: '&copy; OpenStreetMap contributors'", "attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors'")
-    # Add the export action to existing maps without rewriting their saved files.
-    if 'data-watermap-enriched' not in content:
-        export_url = html.escape(url_for('download_enriched', page_name=page_name), quote=True)
-        content = content.replace('</nav>', f' · <a data-watermap-enriched href="{export_url}" download style="display:inline-block; padding:8px 12px; margin:4px 0; background:#edf2ff; border:1px solid #c7d2fe; border-radius:6px;">GPX enrichi · eau et WC</a></nav>', 1)
+    # Apply the current field layout to saved maps without regenerating their data.
+    content = re.sub(r'<body(?=[\s>])', '<body data-watermap-map', content, count=1)
+    content = content.replace('</head>', render_template('map_styles.html') + '</head>', 1)
+    navigation = render_template('map_navigation.html', page_name=page_name, user_id=current_user.id)
+    content = re.sub(r'<nav(?:\s[^>]*)?>.*?</nav>', lambda match: navigation, content, count=1, flags=re.S)
+    content = content.replace('</body>', render_template('map_controls.html') + '</body>', 1)
     return app.response_class(content, mimetype='text/html')
 
 
