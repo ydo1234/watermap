@@ -282,7 +282,7 @@ def test_browser_login_from_rendered_form(module, client, entry_path):
     }, follow_redirects=True)
     assert response.status_code == 200
     assert response.request.path == '/'
-    assert 'Mes pages' in response.get_data(as_text=True)
+    assert 'Mes parcours' in response.get_data(as_text=True)
 
 
 def test_map_uses_origin_referrer_without_exposing_private_path(module, client, owner):

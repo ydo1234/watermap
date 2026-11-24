@@ -3,267 +3,201 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WaterMap - Gestion des itinéraires</title>
+  <title>WaterMap - Mes parcours</title>
   <style>
+    :root { color-scheme: light; --ink: #202b40; --muted: #647086; --primary: #5261ce; --line: #e1e5ef; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-    header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    h1 {
-      color: white;
-      font-size: 2.5rem;
-      margin-bottom: 10px;
-    }
-    .subtitle {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 1.1rem;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-      margin-bottom: 30px;
-    }
-    .card h2 {
-      color: #333;
-      margin-bottom: 20px;
-      font-size: 1.5rem;
-    }
-    #upload-form {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-    #upload-form > div {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    #upload-form label {
-      font-weight: 600;
-      color: #333;
-      font-size: 0.95rem;
-    }
-    #upload-form input[type=text],
-    #upload-form input[type=file] {
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 1rem;
-      transition: border-color 0.3s;
-    }
-    #upload-form input[type=text]:focus,
-    #upload-form input[type=file]:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-    #upload-form button {
-      padding: 12px 24px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      align-self: flex-start;
-    }
-    #upload-form button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-    }
-    progress {
-      width: 100%;
-      height: 8px;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    #upload-status {
-      font-size: 0.95rem;
-      color: #666;
-      font-weight: 500;
-      min-height: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    table thead {
-      background: #f8f9fa;
-    }
-    table th {
-      padding: 15px;
-      text-align: left;
-      font-weight: 600;
-      color: #333;
-      border-bottom: 2px solid #e0e0e0;
-    }
-    table td {
-      padding: 15px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-    table tr:hover {
-      background: #f8f9fa;
-    }
-    table a {
-      color: #667eea;
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-    table a:hover {
-      color: #764ba2;
-    }
-    .btn-delete {
-      padding: 8px 12px;
-      background: #ff6b6b;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background 0.2s;
-    }
-    .btn-delete:hover {
-      background: #ee5a52;
-    }
-    .empty-state {
-      text-align: center;
-      color: #999;
-      font-size: 1.1rem;
-      padding: 40px 20px;
-    }
+    body { font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: var(--ink); background: #f4f6fa; min-height: 100vh; padding: 32px 24px; }
+    button, input { font: inherit; }
+    button, a, summary { -webkit-tap-highlight-color: transparent; }
+    button, summary { cursor: pointer; }
+    a { color: var(--primary); }
+    button:disabled { opacity: .55; cursor: wait; }
+    :focus-visible { outline: 3px solid #8995ee; outline-offset: 3px; }
+    .container { max-width: 1120px; margin: auto; }
+    .site-header { display: flex; justify-content: space-between; gap: 24px; align-items: center; margin-bottom: 32px; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; background: var(--primary); color: white; border-radius: 13px; flex: 0 0 auto; }
+    .brand h1 { font-size: 1.35rem; letter-spacing: -.04em; font-weight: 750; }
+    .subtitle { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+    .account-menu { position: relative; flex: 0 0 auto; }
+    .account-menu summary { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); background: white; border-radius: 12px; list-style: none; font-size: .9rem; }
+    summary::-webkit-details-marker { display: none; }
+    .account-name { max-width: 150px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .chevron { width: 16px; height: 16px; transition: transform .15s; flex: 0 0 auto; }
+    details[open] > summary .chevron { transform: rotate(180deg); }
+    .account-actions { position: absolute; top: calc(100% + 8px); right: 0; min-width: 220px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: 0 12px 32px #2430461a; z-index: 1000; }
+    .account-actions a, .account-actions button { display: flex; align-items: center; min-height: 44px; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-decoration: none; font-size: .9rem; text-align: left; }
+    .account-actions a:hover, .account-actions button:hover { background: #f0f2fa; }
+    .environment { display: inline-block; margin-top: 8px; color: #855b08; background: #fff0c2; border: 1px solid #ead59c; padding: 2px 9px; border-radius: 6px; font-size: .75rem; font-weight: 600; }
+    .flash { padding: 12px 16px; border-radius: 10px; background: #e8f2ec; margin-bottom: 16px; overflow-wrap: anywhere; }
+    .flash-error { background: #fff0ed; color: #9d352f; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 28px; align-items: start; }
+    .card { background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 3px 12px #24304604; }
+    .create-card > summary { display: flex; align-items: center; gap: 12px; padding: 22px; list-style: none; }
+    .create-card > summary > .chevron { margin-left: auto; }
+    .create-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; border-radius: 11px; background: #eef0ff; color: var(--primary); font-size: 1.5rem; font-weight: 400; }
+    .create-title { font-weight: 650; }
+    .create-description { display: block; color: var(--muted); font-size: .8rem; font-weight: 400; margin-top: 2px; }
+    .create-content { padding: 0 22px 22px; }
+    #upload-form { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    #upload-form label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 7px; }
+    #upload-form input { width: 100%; min-width: 0; max-width: 100%; min-height: 46px; border: 1px solid #cbd2e0; border-radius: 10px; padding: 10px 12px; background: white; color: var(--ink); }
+    #upload-form input:focus { border-color: var(--primary); }
+    #upload-form input[type=file] { display: block; padding: 6px; font-size: .8rem; overflow: hidden; }
+    #upload-form input::file-selector-button { padding: 8px 10px; margin-right: 8px; border: 0; border-radius: 6px; background: #edf0fa; color: #38436a; font: inherit; cursor: pointer; }
+    .source-picker { min-width: 0; padding: 14px; border-radius: 12px; background: #f6f7fb; }
+    #source-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 16px; border-radius: 10px; background: #e8ebf3; }
+    .tab-btn { min-width: 0; min-height: 44px; padding: 8px 6px; border: 0; border-radius: 7px; background: transparent; color: #5a657b; font-size: .8rem; font-weight: 600; line-height: 1.3; }
+    .tab-btn.active { color: #3546b7; background: white; box-shadow: 0 1px 4px #24304615; }
+    .help { color: var(--muted); font-size: .78rem; margin-top: 6px; }
+    .primary-button { width: 100%; min-height: 48px; padding: 12px 16px; border: 0; border-radius: 10px; background: var(--primary); color: white; font-weight: 650; }
+    .primary-button:hover { background: #414fb6; }
+    progress { width: 100%; height: 8px; accent-color: var(--primary); }
+    #upload-status { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+    .upload-feedback:has(#upload-status:empty) { display: none; }
+    .upload-feedback { margin-top: 16px; }
+    .section-heading { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; min-height: 38px; }
+    .section-heading h2 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.035em; }
+    .route-count { min-width: 28px; padding: 2px 8px; border-radius: 8px; background: #e7eaf4; color: #54617c; font-size: .8rem; text-align: center; font-weight: 600; }
+    .route-list { display: grid; gap: 12px; list-style: none; }
+    .route-item { padding: 18px; min-width: 0; }
+    .route-title { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; min-height: 44px; margin-bottom: 16px; font-size: 1rem; line-height: 1.4; font-weight: 650; }
+    .route-title:hover { color: var(--primary); }
+    .route-symbol { display: grid; place-items: center; flex: 0 0 auto; width: 40px; height: 40px; border-radius: 11px; color: var(--primary); background: #eef1ff; }
+    .route-name { overflow-wrap: anywhere; min-width: 0; }
+    .route-arrow { margin-left: auto; color: #8b94a9; font-size: 1.5rem; font-weight: 400; }
+    .route-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+    .route-actions a, .btn-delete { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; padding: 10px 8px; border-radius: 9px; font-size: .82rem; line-height: 1.4; font-weight: 600; text-align: center; text-decoration: none; }
+    .download-link { background: #eef1ff; border: 1px solid #e0e5fc; color: #4655b4; }
+    .download-link:hover { background: #e3e8ff; }
+    .btn-delete { border: 1px solid #eadfe1; background: white; color: #a74b50; }
+    .btn-delete:hover { background: #fff5f5; border-color: #dbb5b8; }
+    #delete-all-form { margin-top: 20px; }
+    #delete-all-form .btn-delete { width: auto; padding: 10px 14px; border-color: transparent; background: transparent; font-weight: 500; }
+    #delete-all-form .btn-delete:hover { background: #fbeeed; }
+    .empty-state { padding: 36px 24px; text-align: center; color: var(--muted); font-size: .9rem; }
+    .empty-state strong { display: block; color: var(--ink); margin-bottom: 6px; font-size: 1rem; }
+    @media (max-width: 900px) { .workspace { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
     @media (max-width: 768px) {
-      h1 { font-size: 1.8rem; }
-      .card { padding: 20px; }
-      #upload-form { gap: 12px; }
-      table { font-size: 0.9rem; }
-      table th, table td { padding: 10px; }
-      .container { padding: 0; }
+      body { padding: 20px 16px 32px; }
+      .site-header { gap: 12px; margin-bottom: 24px; align-items: flex-start; }
+      .brand-mark { width: 36px; height: 36px; border-radius: 11px; }
+      .brand h1 { font-size: 1.2rem; }
+      .subtitle { max-width: 220px; font-size: .8rem; margin-top: 8px; }
+      .account-menu summary { padding: 8px 10px; gap: 6px; }
+      .account-name { max-width: 80px; }
+      .create-card > summary { padding: 16px; }
+      .create-content { padding: 0 16px 18px; }
+      .section-heading { margin-bottom: 12px; }
+      .section-heading h2 { font-size: 1.3rem; }
+      .route-item { padding: 16px; border-radius: 15px; }
+      .route-title { font-size: 1rem; }
+      #delete-all-form .btn-delete { width: 100%; }
     }
+    @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
-      <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div style="padding: 8px 15px; border-radius: 20px; font-size: 0.9rem; background: rgba(255,255,255,0.9); color: #333; margin-right: auto;">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-        
-        <div style="background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 30px; display: flex; align-items: center; gap: 10px; color: white;">
-          <span style="font-weight: 500;">👤 {{ user.name }}</span>
-          {% if user.is_admin %}<a href="{{ url_for('admin') }}" style="color: white;">Administration</a>{% endif %}
-          <a href="{{ url_for('change_password') }}" style="color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.9rem; margin-left: 10px; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 10px;">🔑 Sécurité</a>
+    <header class="site-header">
+      <div>
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><svg width="23" height="25" viewBox="0 0 24 28" fill="none"><path d="M12 2C9 7 3 13 3 18a9 9 0 0 0 18 0c0-5-6-11-9-16Z" stroke="currentColor" stroke-width="2"/><path d="M7 18a5 5 0 0 0 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <h1>WaterMap</h1>
+        </div>
+        <p class="subtitle">Vos parcours, avec les points d’eau et toilettes.</p>
+        {% if is_dev %}<span class="environment">Recette · développement</span>{% endif %}
+      </div>
+      <details class="account-menu">
+        <summary><span class="account-name">{{ user.name }}</span><svg class="chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 8 5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="account-actions">
+          {% if user.is_admin %}<a href="{{ url_for('admin') }}">Administration</a>{% endif %}
+          <a href="{{ url_for('change_password') }}">Sécurité du compte</a>
           <form action="{{ url_for('logout') }}" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" style="background: transparent; border: 0; color: white; cursor: pointer;">🚪 Déconnexion</button>
+            <button type="submit">Déconnexion</button>
           </form>
         </div>
-      </div>
-      {% if is_dev %}
-      <div style="background: #ffeb3b; color: #333; padding: 5px 15px; border-radius: 20px; display: inline-block; font-weight: bold; margin-bottom: 10px; font-size: 0.8rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">⚠️ MODE DÉVELOPPEMENT</div>
-      {% endif %}
-      <h1>🗺️ WaterMap</h1>
-      <p class="subtitle">Gérez vos itinéraires personnels et découvrez les points d'eau</p>
+      </details>
     </header>
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <div class="flash flash-{{ category }}" role="status">{{ message }}</div>
+    {% endfor %}
     {% include 'announcements.html' %}
-
-    <div class="card">
-      <h2>📤 Créer une nouvelle page</h2>
-      <form id="upload-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div>
-          <label for="page_name">Nom de la page</label>
-          <input type="text" id="page_name" name="page_name" placeholder="Ex: Rando Cévennes" maxlength="100" required>
-        </div>
-        
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #ccc;">
-          <div id="source-tabs" style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <button type="button" id="tab-file" class="tab-btn active" style="padding: 5px 15px; border-radius: 20px; border: none; cursor: pointer; background: #667eea; color: white;">Fichier GPX</button>
-            <button type="button" id="tab-url" class="tab-btn" style="padding: 5px 15px; border-radius: 20px; border: none; cursor: pointer; background: #e0e0e0; color: #666;">Lien Google Maps / GPX</button>
+    <main class="workspace">
+      <details class="card create-card" id="create-panel" open>
+        <summary><span class="create-icon" aria-hidden="true">+</span><span class="create-title">Créer un parcours<span class="create-description">À partir d’un GPX ou d’un lien</span></span><svg class="chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 8 5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="create-content">
+          <form id="upload-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+              <label for="page_name">Nom du parcours</label>
+              <input type="text" id="page_name" name="page_name" placeholder="Ex. Rando Cévennes" maxlength="100" required>
+            </div>
+            <div class="source-picker">
+              <div id="source-tabs" role="group" aria-label="Source du parcours">
+                <button type="button" id="tab-file" class="tab-btn active" aria-pressed="true">Fichier GPX</button>
+                <button type="button" id="tab-url" class="tab-btn" aria-pressed="false">Lien / My Maps</button>
+              </div>
+              <div id="file-input-container">
+                <label for="gpx_file">Choisir un fichier .gpx</label>
+                <input type="file" id="gpx_file" name="gpx_file" accept=".gpx" required>
+              </div>
+              <div id="url-input-container" style="display:none;">
+                <label for="gpx_url_input">Lien Google My Maps ou GPX</label>
+                <input type="text" id="gpx_url_input" name="gpx_url" placeholder="https://…">
+                <p class="help">Pour Google Maps, utilisez un lien « My Maps ».</p>
+              </div>
+            </div>
+            <div>
+              <label for="max_distance">Distance autour du tracé (m)</label>
+              <input type="number" id="max_distance" name="max_distance" min="0" max="5000" step="1" value="500" required>
+              <p class="help">Rechercher les points d’eau et toilettes dans ce rayon.</p>
+            </div>
+            <button type="submit" class="primary-button">Créer le parcours</button>
+          </form>
+          <div class="upload-feedback">
+            <progress id="upload-progress" value="0" max="100" style="display:none;" aria-label="Création du parcours"></progress>
+            <div id="upload-status" role="status" aria-live="polite"></div>
           </div>
-
-          <div id="file-input-container">
-            <label for="gpx_file">Choisir un fichier .gpx</label>
-            <input type="file" id="gpx_file" name="gpx_file" accept=".gpx">
-          </div>
-
-          <div id="url-input-container" style="display: none;">
-            <label for="gpx_url_input">Lien Google My Maps ou URL GPX</label>
-            <input type="text" id="gpx_url_input" name="gpx_url" placeholder="https://www.google.com/maps/d/viewer?mid=...">
-            <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Note : Pour Google Maps, utilisez un lien "My Maps".</p>
-          </div>
         </div>
-
-        <div>
-          <label for="max_distance">Distance max depuis la trace (m)</label>
-          <input type="number" id="max_distance" name="max_distance" min="0" max="5000" step="1" value="500" required>
-        </div>
-        <button type="submit">📂 Créer la page</button>
-      </form>
-      <div style="margin-top: 20px;">
-        <progress id="upload-progress" value="0" max="100" style="display:none;"></progress>
-        <div id="upload-status"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>📋 Mes pages</h2>
-      {% if pages %}
-        <form id="delete-all-form" action="{{ url_for('delete_all') }}" method="post" style="margin-bottom:20px;">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="page_count" value="{{ pages|length }}">
-          <input type="hidden" name="confirm_delete_all" value="">
-          <button type="submit" class="btn-delete" disabled>🗑️ Supprimer tous mes parcours</button>
-          <noscript><p>Activez JavaScript pour confirmer la suppression de tous vos parcours.</p></noscript>
-        </form>
-        <table>
-          <thead>
-            <tr>
-              <th>📍 Page</th>
-              <th style="text-align: right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+      </details>
+      <section class="routes-section" aria-labelledby="routes-heading">
+        <div class="section-heading"><h2 id="routes-heading">Mes parcours</h2><span class="route-count" aria-label="Nombre de parcours">{{ pages|length }}</span></div>
+        {% if pages %}
+          <ul class="route-list">
             {% for page in pages %}
-              <tr>
-                <td><a href="{{ url_for('page', page_name=page.name) }}">{{ page.name }}</a></td>
-                <td style="text-align: right;">
-                  <a href="{{ url_for('download_enriched', page_name=page.name) }}" download title="Télécharger le parcours avec ses points d’eau et toilettes" style="display:inline-block; margin: 4px 12px 4px 0; padding: 8px 12px; background: #edf2ff; border: 1px solid #c7d2fe; border-radius: 6px;">⬇ GPX enrichi · eau et WC</a>
-                  <form class="delete-form" data-page-name="{{ page.name }}" action="{{ url_for('delete', page_name=page.name) }}" method="post" style="display:inline;">
+              <li class="card route-item">
+                <a class="route-title" href="{{ url_for('page', page_name=page.name) }}">
+                  <span class="route-symbol" aria-hidden="true"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <span class="route-name">{{ page.name|replace('_', ' ') }}</span><span class="route-arrow" aria-hidden="true">›</span>
+                </a>
+                <div class="route-actions">
+                  <a class="download-link" href="{{ url_for('download_enriched', page_name=page.name) }}" download title="Télécharger le parcours avec ses points d’eau et toilettes">↓ GPX · eau et WC</a>
+                  <form class="delete-form" data-page-name="{{ page.name }}" action="{{ url_for('delete', page_name=page.name) }}" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-delete">🗑️ Supprimer</button>
+                    <button type="submit" class="btn-delete" aria-label="Supprimer {{ page.name }}">Supprimer</button>
                   </form>
-                </td>
-              </tr>
+                </div>
+              </li>
             {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <div class="empty-state">✨ Aucune page pour le moment. Commencez par en créer une !</div>
-      {% endif %}
-    </div>
+          </ul>
+          <form id="delete-all-form" action="{{ url_for('delete_all') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="page_count" value="{{ pages|length }}">
+            <input type="hidden" name="confirm_delete_all" value="">
+            <button type="submit" class="btn-delete" disabled>Supprimer tous mes parcours</button>
+            <noscript><p>Activez JavaScript pour confirmer la suppression de tous vos parcours.</p></noscript>
+          </form>
+        {% else %}
+          <div class="card empty-state"><strong>Aucun parcours pour le moment.</strong>Créez un parcours pour retrouver sa carte, ses points d’eau et ses toilettes.</div>
+        {% endif %}
+      </section>
+    </main>
   </div>
-
   <script nonce="{{ csp_nonce() }}">
+    if (window.matchMedia('(max-width: 768px)').matches) document.getElementById('create-panel').open = false;
     const deleteAllForm = document.getElementById('delete-all-form');
     if (deleteAllForm) {
       deleteAllForm.addEventListener('submit', event => {
@@ -297,10 +231,10 @@
 
     tabFile.addEventListener('click', () => {
       activeTab = 'file';
-      tabFile.style.background = '#667eea';
-      tabFile.style.color = 'white';
-      tabUrl.style.background = '#e0e0e0';
-      tabUrl.style.color = '#666';
+      tabFile.classList.add('active');
+      tabUrl.classList.remove('active');
+      tabFile.setAttribute('aria-pressed', 'true');
+      tabUrl.setAttribute('aria-pressed', 'false');
       fileContainer.style.display = 'block';
       urlContainer.style.display = 'none';
       gpxFile.setAttribute('required', '');
@@ -309,10 +243,10 @@
 
     tabUrl.addEventListener('click', () => {
       activeTab = 'url';
-      tabUrl.style.background = '#667eea';
-      tabUrl.style.color = 'white';
-      tabFile.style.background = '#e0e0e0';
-      tabFile.style.color = '#666';
+      tabUrl.classList.add('active');
+      tabFile.classList.remove('active');
+      tabUrl.setAttribute('aria-pressed', 'true');
+      tabFile.setAttribute('aria-pressed', 'false');
       fileContainer.style.display = 'none';
       urlContainer.style.display = 'block';
       gpxUrl.setAttribute('required', '');
