@@ -82,6 +82,25 @@ def test_import_preserves_trace_and_returns_through_sso_without_duplicates(modul
     assert not Path(module.get_user_upload_folder(user.id), 'Duplicate.gpx').exists()
 
 
+def test_deleted_import_can_be_created_again(module, client, integration):
+    assert push(client, integration).status_code == 201
+    authenticate(client, integration)
+    response = client.post(PATH, data={'csrf_token': csrf(client, PATH), 'page_name': 'Tour', 'max_distance': '500'})
+    first_task = response.json['task_id']
+    result = wait_for(client, first_task)
+    assert not result['error']
+    assert client.post('/delete/Tour', data={'csrf_token': csrf(client, '/')}).status_code == 302
+    response = client.get(PATH)
+    assert response.status_code == 200
+    assert 'const activeTask = null;' in response.text
+    response = client.post(PATH, data={'csrf_token': csrf(client, PATH), 'page_name': 'Tour', 'max_distance': '500'})
+    assert response.status_code == 202
+    assert response.json['task_id'] != first_task
+    result = wait_for(client, response.json['task_id'])
+    assert not result['error']
+    assert client.get(result['page_url']).status_code == 200
+
+
 def test_transfer_is_private_and_expires(module, client, integration):
     assert push(client, integration).status_code == 201
     other = module.app.test_client()

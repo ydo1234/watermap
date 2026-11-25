@@ -121,14 +121,15 @@ def install_cyclerouter(app, db, csrf, limiter, oidc, start_upload, get_status, 
             target = url_for('page', page_name=row.page_name) if row.page_name else None
             exists = row.page_name and Path(page_folder(current_user.id), row.page_name + '.html').is_file()
             status = get_status(row.task_id) if row.task_id else None
+            running = status and not status.get('done') and not status.get('error')
             if request.method == 'GET':
                 if exists:
                     return redirect(target)
                 return render_template('cyclerouter_import.html', name=row.name[:100],
-                    task_id=row.task_id if status and not status.get('error') else None)
+                    task_id=row.task_id if running else None)
             if exists:
                 return jsonify(page_url=target)
-            if status and not status.get('error'):
+            if running:
                 return jsonify(task_id=row.task_id), 202
             source = FileStorage(stream=BytesIO(row.gpx), filename=(secure_filename(row.name)[:100] or 'parcours') + '.gpx',
                                  content_type='application/gpx+xml')
